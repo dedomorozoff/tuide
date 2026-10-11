@@ -1,0 +1,18 @@
+            ╭──────────────────────────────────╮
+            │ actions                          │
+       ╭────│                                  │──╮
+       │● We│ ❯                                │  │
+       │tuiD│                                  │  │
+       │44x9│ › Close window                   │  │
+       │    │   Maximize window                │  │
+       │ctrl│   Minimize window                │  │
+       │    │   Snap left                      │  │
+       │    │   Snap right                     │  │
+       │    │   Snap top                       │  │
+       ╰────│   Snap bottom                    │──╯
+            │   Snap center                    │
+            │   Toggle layout                  │
+            │                                  │
+            │ enter run · esc cancel · ↑↓ move │
+            ╰──────────────────────────────────╯
+ ≡ start  Welcome                        21:45  ctrl+q quit
