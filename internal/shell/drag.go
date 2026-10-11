@@ -3,8 +3,8 @@ package shell
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"tuide/internal/geom"
-	"tuide/internal/wm"
+	"github.com/dedomorozoff/tuide/internal/geom"
+	"github.com/dedomorozoff/tuide/internal/wm"
 )
 
 // dragSnapMargin is how many cells from a work-area edge a window must be

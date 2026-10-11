@@ -3,7 +3,7 @@ package wm
 import (
 	"sort"
 
-	"tuide/internal/geom"
+	"github.com/dedomorozoff/tuide/internal/geom"
 )
 
 // Layout is how a workspace arranges its windows.

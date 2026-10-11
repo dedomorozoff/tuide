@@ -6,10 +6,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tuide/internal/appsdk"
-	"tuide/internal/input"
-	"tuide/internal/theme"
-	"tuide/internal/wm"
+	"github.com/dedomorozoff/tuide/internal/appsdk"
+	"github.com/dedomorozoff/tuide/internal/input"
+	"github.com/dedomorozoff/tuide/internal/theme"
+	"github.com/dedomorozoff/tuide/internal/wm"
 )
 
 // launcherDesktop builds a desktop with three stub apps, none of them open, so

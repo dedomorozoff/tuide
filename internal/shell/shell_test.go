@@ -10,9 +10,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"tuide/internal/apps/welcome"
-	"tuide/internal/appsdk"
-	"tuide/internal/theme"
+	"github.com/dedomorozoff/tuide/internal/apps/welcome"
+	"github.com/dedomorozoff/tuide/internal/appsdk"
+	"github.com/dedomorozoff/tuide/internal/theme"
 )
 
 const (

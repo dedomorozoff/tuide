@@ -1,4 +1,4 @@
-module tuide
+module github.com/dedomorozoff/tuide
 
 go 1.26.0
 

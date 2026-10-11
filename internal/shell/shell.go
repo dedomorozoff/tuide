@@ -7,13 +7,13 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tuide/internal/appsdk"
-	"tuide/internal/compositor"
-	"tuide/internal/config"
-	"tuide/internal/geom"
-	"tuide/internal/input"
-	"tuide/internal/theme"
-	"tuide/internal/wm"
+	"github.com/dedomorozoff/tuide/internal/appsdk"
+	"github.com/dedomorozoff/tuide/internal/compositor"
+	"github.com/dedomorozoff/tuide/internal/config"
+	"github.com/dedomorozoff/tuide/internal/geom"
+	"github.com/dedomorozoff/tuide/internal/input"
+	"github.com/dedomorozoff/tuide/internal/theme"
+	"github.com/dedomorozoff/tuide/internal/wm"
 )
 
 // TaskbarHeight is how many rows the taskbar occupies at the bottom.

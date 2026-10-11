@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"tuide/internal/geom"
+	"github.com/dedomorozoff/tuide/internal/geom"
 )
 
 func TestScreenBlitPlainText(t *testing.T) {

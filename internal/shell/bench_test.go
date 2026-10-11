@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"tuide/internal/appsdk"
-	"tuide/internal/theme"
-	"tuide/internal/wm"
+	"github.com/dedomorozoff/tuide/internal/appsdk"
+	"github.com/dedomorozoff/tuide/internal/theme"
+	"github.com/dedomorozoff/tuide/internal/wm"
 )
 
 // tenWindowDesktop builds a desktop with ten stub windows, matching M1's

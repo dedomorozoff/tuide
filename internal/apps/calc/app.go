@@ -9,9 +9,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"tuide/internal/appsdk"
-	"tuide/internal/expr"
-	"tuide/internal/theme"
+	"github.com/dedomorozoff/tuide/internal/appsdk"
+	"github.com/dedomorozoff/tuide/internal/expr"
+	"github.com/dedomorozoff/tuide/internal/theme"
 )
 
 // App holds the expression being typed and the last result.

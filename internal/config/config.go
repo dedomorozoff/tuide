@@ -7,8 +7,8 @@ import (
 	"io/fs"
 	"os"
 
-	"tuide/internal/sys"
-	"tuide/internal/theme"
+	"github.com/dedomorozoff/tuide/internal/sys"
+	"github.com/dedomorozoff/tuide/internal/theme"
 )
 
 // FileName is the config file inside the config directory.

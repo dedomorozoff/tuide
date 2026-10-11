@@ -6,8 +6,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"tuide/internal/geom"
-	"tuide/internal/wm"
+	"github.com/dedomorozoff/tuide/internal/geom"
+	"github.com/dedomorozoff/tuide/internal/wm"
 )
 
 // drawTabHUD lists the visible windows while alt-tab cycles the focus. It

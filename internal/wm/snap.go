@@ -1,6 +1,6 @@
 package wm
 
-import "tuide/internal/geom"
+import "github.com/dedomorozoff/tuide/internal/geom"
 
 // Zone is a place a window can be snapped to. Halves split along one axis,
 // quarters along both, center keeps a comfortable floating size.

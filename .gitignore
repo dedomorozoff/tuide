@@ -1,4 +1,22 @@
+# Binary
 tuide
 tuide.exe
 /dist/
+
+# Test
 *.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+/tmp/

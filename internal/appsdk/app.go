@@ -5,8 +5,8 @@ package appsdk
 import (
 	"charm.land/bubbletea/v2"
 
-	"tuide/internal/geom"
-	"tuide/internal/theme"
+	"github.com/dedomorozoff/tuide/internal/geom"
+	"github.com/dedomorozoff/tuide/internal/theme"
 )
 
 // Context is what the window manager tells an app about its current frame.

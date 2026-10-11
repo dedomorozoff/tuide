@@ -3,8 +3,8 @@ package shell
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"tuide/internal/config"
-	"tuide/internal/theme"
+	"github.com/dedomorozoff/tuide/internal/config"
+	"github.com/dedomorozoff/tuide/internal/theme"
 )
 
 // configSavedMsg carries the result of the background config write.

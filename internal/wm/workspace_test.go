@@ -3,7 +3,7 @@ package wm
 import (
 	"testing"
 
-	"tuide/internal/geom"
+	"github.com/dedomorozoff/tuide/internal/geom"
 )
 
 func TestWorkspacesStartOnTheFirstOne(t *testing.T) {

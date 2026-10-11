@@ -1,8 +1,8 @@
 package wm
 
 import (
-	"tuide/internal/appsdk"
-	"tuide/internal/geom"
+	"github.com/dedomorozoff/tuide/internal/appsdk"
+	"github.com/dedomorozoff/tuide/internal/geom"
 )
 
 // State is where a window sits in the stack.

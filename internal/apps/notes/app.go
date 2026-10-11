@@ -8,9 +8,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"tuide/internal/appsdk"
-	"tuide/internal/textbuf"
-	"tuide/internal/theme"
+	"github.com/dedomorozoff/tuide/internal/appsdk"
+	"github.com/dedomorozoff/tuide/internal/textbuf"
+	"github.com/dedomorozoff/tuide/internal/theme"
 )
 
 // App is a document plus the cursor the shell draws inside the window.

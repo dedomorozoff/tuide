@@ -8,8 +8,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"tuide/internal/fuzzy"
-	"tuide/internal/input"
+	"github.com/dedomorozoff/tuide/internal/fuzzy"
+	"github.com/dedomorozoff/tuide/internal/input"
 )
 
 // launcherMode picks what the overlay lists: launchable apps or shell actions.

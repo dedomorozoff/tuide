@@ -6,8 +6,8 @@ import (
 
 	"charm.land/bubbletea/v2"
 
-	"tuide/internal/appsdk"
-	"tuide/internal/geom"
+	"github.com/dedomorozoff/tuide/internal/appsdk"
+	"github.com/dedomorozoff/tuide/internal/geom"
 )
 
 // Workspaces is how many virtual desktops the manager offers.

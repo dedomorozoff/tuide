@@ -5,7 +5,7 @@ import (
 
 	"charm.land/bubbletea/v2"
 
-	"tuide/internal/geom"
+	"github.com/dedomorozoff/tuide/internal/geom"
 )
 
 // Screen is a grid of cells that windows, panels and overlays are blitted into.

@@ -3,7 +3,7 @@ package appsdk
 import (
 	"time"
 
-	"tuide/internal/config"
+	"github.com/dedomorozoff/tuide/internal/config"
 )
 
 // Tick is broadcast by the desktop once a second so apps that display the time

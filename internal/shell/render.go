@@ -5,9 +5,9 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"tuide/internal/geom"
-	"tuide/internal/theme"
-	"tuide/internal/wm"
+	"github.com/dedomorozoff/tuide/internal/geom"
+	"github.com/dedomorozoff/tuide/internal/theme"
+	"github.com/dedomorozoff/tuide/internal/wm"
 )
 
 const hint = " ctrl+q quit "
