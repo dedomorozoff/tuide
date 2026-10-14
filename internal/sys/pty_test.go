@@ -13,21 +13,27 @@ import (
 
 const ptyReadTimeout = 15 * time.Second
 
+// liveEnvVar turns the tests that spawn a real child on. Every one of them
+// starts a console process on the machine running the suite and tears it down
+// again, which on a desktop means windows appearing and being killed. That is
+// worth having and not worth paying for on every `go test ./...`, so they are
+// opt in: set TUIDE_LIVE_TESTS=1.
+const liveEnvVar = "TUIDE_LIVE_TESTS"
+
 // echoMarker is printed by the child in every shell tuiDE ships a default for:
 // both /bin/sh and PowerShell understand `echo`.
 const echoMarker = "tuide-pty-ok"
 
-// requireLivePTY skips the test only where the pseudoconsole is forced on a
-// host that cannot host one. Such a host starts the client, never writes a
-// byte, and the pipe it is attached to cannot be woken up again, which wedges
-// the whole test binary. Everywhere else the transport is probed and the pipes
-// fallback makes the terminal work, so the test is worth running.
+// requireLivePTY skips the test unless a live child was asked for. On a host
+// where the pseudoconsole was forced with TUIDE_PTY=conpty the read cannot be
+// woken up again and the pipe wedges the whole test binary, so that case is
+// skipped too.
 func requireLivePTY(t *testing.T) {
 	t.Helper()
-	if runtime.GOOS != "windows" {
-		return
+	if os.Getenv(liveEnvVar) != "1" {
+		t.Skipf("set %s=1 to run tests that spawn a real child", liveEnvVar)
 	}
-	if strings.EqualFold(os.Getenv("TUIDE_PTY"), "conpty") {
+	if runtime.GOOS == "windows" && strings.EqualFold(os.Getenv("TUIDE_PTY"), "conpty") {
 		t.Skip("TUIDE_PTY=conpty forces a pseudoconsole this host cannot wake a read on")
 	}
 }

@@ -1,17 +1,17 @@
 
 
-       ╭──────────────────────────────────────────╮
-       │● Welcome                                 │
-       │╭─────────────────────────────────────────╮
-       ││ tuiDE inspector                         │
-       ││ workspace  1/9                          │
-       ││ layout     floating                     │
-       ││ windows    1                            │
-       ││ focus      Welcome                      │
-       ││                                         │
-       ╰│ z   window        rect           state  │
-        │ ●1  Welcome        7,2    46x12  normal │
-        ╰─────────────────────────────────────────╯
+       ╭────────────────────────────────────────────╮
+       │● Welcome                          [_][^][x]│
+       │╭─────────────────────────────────────────╮ │
+       ││ tuiDE inspector                         │ │
+       ││ workspace  1/9                          │ │
+       ││ layout     floating                     │s│
+       ││ windows    1                            │ │
+       ││ focus      Welcome                      │ │
+       ││                                         │ │
+       ││ z   window        rect           state  │ │
+       ││ ●1  Welcome        7,2    46x12  normal │ │
+       ╰╰─────────────────────────────────────────╯─╯
 
 
 

@@ -58,12 +58,21 @@ func NewStyles(t Theme) Styles {
 
 		Panel: lipgloss.NewStyle().Foreground(t.Text).Background(t.Panel),
 
+		// The border styles carry the background on purpose. A cell with no
+		// style at all is rendered as a full reset, so a window frame without
+		// one hands its whole interior back to the host terminal's colours: the
+		// window body came out in whatever foreground and background the
+		// terminal happened to use, which on a light profile reads as white
+		// text on a white block.
 		Border: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(t.Border),
+			BorderForeground(t.Border).
+			Background(t.Background),
+
 		BorderFocus: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(t.BorderFocused),
+			BorderForeground(t.BorderFocused).
+			Background(t.Background),
 
 		Title:       lipgloss.NewStyle().Foreground(t.Text).Background(t.TitleBar),
 		TitleFocus:  lipgloss.NewStyle().Foreground(t.TextStrong).Background(t.TitleBarFocus),
@@ -85,6 +94,12 @@ func NewStyles(t Theme) Styles {
 
 // WindowChrome returns the lipgloss styles for a window at a given size.
 // Focused and inactive windows get different border and title colors.
+//
+// lipgloss counts the border into the width and the height it is given, so the
+// frame takes the whole rectangle. Subtracting the border a second time made
+// the inner area two cells narrower than the label laid out for, and lipgloss
+// wrapped the title: the window controls fell onto a second row, under the
+// app's own content, where nobody could see or click them.
 func (s Styles) WindowChrome(focused bool, width, height int) (frame, title lipgloss.Style) {
 	frameStyle := s.Border
 	titleStyle := s.TitleDim
@@ -92,7 +107,7 @@ func (s Styles) WindowChrome(focused bool, width, height int) (frame, title lipg
 		frameStyle = s.BorderFocus
 		titleStyle = s.TitleFocus
 	}
-	frame = frameStyle.Width(max(0, width-2)).Height(max(0, height-2))
+	frame = frameStyle.Width(max(0, width)).Height(max(0, height))
 	title = titleStyle.Width(max(0, width-2))
 	return frame, title
 }

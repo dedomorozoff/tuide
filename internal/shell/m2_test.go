@@ -1,10 +1,12 @@
 package shell
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dedomorozoff/tuide/internal/appsdk"
 	"github.com/dedomorozoff/tuide/internal/config"
@@ -333,6 +335,29 @@ func TestTaskbarMiddleClickOnTheBarMissesWindows(t *testing.T) {
 
 	if m.windows.Count() != 1 {
 		t.Errorf("a click on bare taskbar must not close anything, got %d", m.windows.Count())
+	}
+}
+
+// TestWindowControlsAreVisibleOnTheTitleRow pins what TestWindowTitleButtons
+// cannot see. The click targets were right all along while lipgloss wrapped the
+// title and pushed the controls onto a second row, under the app's content, so
+// the window looked like it had no buttons and a click went to the wrong place.
+func TestWindowControlsAreVisibleOnTheTitleRow(t *testing.T) {
+	m := newTestDesktop()
+	_ = m.Init()
+
+	w := m.windows.Focused()
+	if w == nil {
+		t.Fatal("no focused window")
+	}
+
+	lines := strings.Split(ansi.Strip(m.View().Content), "\n")
+	titleRow := w.Rect.Y + 1
+	if titleRow >= len(lines) {
+		t.Fatalf("title row %d is outside a %d line frame", titleRow, len(lines))
+	}
+	if !strings.Contains(lines[titleRow], "[_][^][x]") {
+		t.Errorf("the title row does not show the window controls: %q", lines[titleRow])
 	}
 }
 

@@ -14,10 +14,19 @@ import (
 
 const liveMarker = "tuide-live-ok"
 
+// liveEnvVar turns the tests that spawn a real child on. Both of them start a
+// console process on the machine running the suite and tear it down again, so
+// they are opt in: set TUIDE_LIVE_TESTS=1.
+const liveEnvVar = "TUIDE_LIVE_TESTS"
+
 // liveShell is the child the end to end test drives: the system command
 // processor on Windows, a plain shell elsewhere.
 func liveShell(t *testing.T) []string {
 	t.Helper()
+
+	if os.Getenv(liveEnvVar) != "1" {
+		t.Skipf("set %s=1 to run tests that spawn a real child", liveEnvVar)
+	}
 
 	if runtime.GOOS == "windows" {
 		shell := os.Getenv("COMSPEC")

@@ -11,10 +11,24 @@ import (
 
 const pipesEchoMarker = "tuide-pipes-ok"
 
+const liveEnvVar = "TUIDE_LIVE_TESTS"
+
+// requireLiveChild skips a test that would start a real console process on the
+// machine running the suite. These tests are worth having and not worth paying
+// for on every `go test ./...`, so they are opt in.
+func requireLiveChild(t *testing.T) {
+	t.Helper()
+	if os.Getenv(liveEnvVar) != "1" {
+		t.Skipf("set %s=1 to run tests that spawn a real child", liveEnvVar)
+	}
+}
+
 // cmdExe is the child these tests drive: it starts in milliseconds, unlike the
 // default PowerShell, and understands `echo`.
 func cmdExe(t *testing.T) string {
 	t.Helper()
+	requireLiveChild(t)
+
 	shell := os.Getenv("COMSPEC")
 	if shell == "" {
 		shell = `C:\Windows\System32\cmd.exe`

@@ -146,6 +146,8 @@ func (s *Screen) BlitCells(rect geom.Rect, cells []Cell) {
 }
 
 // write paints a grapheme and reserves the remaining cells of wide characters.
+// A blit replaces the cell outright, style included: text painted over a
+// coloured cell takes the colour of what painted it, not the colour it covered.
 func (s *Screen) write(x, y int, cell Cell) {
 	s.Set(x, y, cell)
 	continuation := Cell{Style: cell.Style, Text: "", Width: 0}

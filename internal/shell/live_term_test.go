@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +22,10 @@ const liveMarker = "tuide-shell-ok"
 // point: they either fake the child or check the emulator in isolation, so a
 // break between the process and the screen would pass all of them.
 func TestTerminalWindowShowsALiveShell(t *testing.T) {
+	if os.Getenv("TUIDE_LIVE_TESTS") != "1" {
+		t.Skip("set TUIDE_LIVE_TESTS=1 to run tests that spawn a real child")
+	}
+
 	palette := theme.Get(theme.DefaultName)
 	desktop := New(palette, []appsdk.Spec{term.Spec(palette)}, Options{
 		Width:   100,
