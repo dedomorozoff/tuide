@@ -1,6 +1,7 @@
 package term
 
 import (
+	"sync"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -24,8 +25,13 @@ type App struct {
 
 	pty  sys.PTY
 	out  chan []byte
-	in   chan []byte
 	done chan struct{}
+
+	// mu guards the write queue below. Keystrokes arrive one Update at a time,
+	// but the writer that drains them is a command, so it runs beside them.
+	mu      sync.Mutex
+	pending [][]byte
+	writing bool
 
 	width  int
 	height int
@@ -49,9 +55,8 @@ const (
 
 	// readChunk is how much output is pulled from the child at a time.
 	readChunk = 8192
-	// readQueue and writeQueue absorb bursts without stalling either side.
-	readQueue  = 64
-	writeQueue = 64
+	// readQueue absorbs bursts of child output without stalling the reader.
+	readQueue = 64
 
 	// wheelStep is how many history lines one wheel click moves.
 	wheelStep = 3
@@ -240,11 +245,9 @@ func (a *App) onStarted(msg startedMsg) tea.Cmd {
 
 	a.pty = msg.terminal
 	a.out = make(chan []byte, readQueue)
-	a.in = make(chan []byte, writeQueue)
 	a.done = make(chan struct{})
 
 	go a.readPump()
-	go a.writePump()
 
 	if err := msg.terminal.Resize(a.width, a.height); err != nil {
 		a.failure = err
@@ -401,21 +404,65 @@ func (a *App) onWheel(mouse tea.Mouse) tea.Cmd {
 	return nil
 }
 
-// send queues bytes for the child process. Both directions run through a
-// channel so the order the user typed in is the order the shell sees. The
-// channels are captured here because the command runs later, by which point
-// the terminal may already be closing.
+// send queues bytes for the child process.
+//
+// The order the user typed in is the order the shell has to see, and Bubble
+// Tea runs every command in its own goroutine, so the bytes cannot be pushed
+// onto a channel from the command: two keystrokes would race and arrive
+// swapped. They are appended here instead, where Update is single threaded, and
+// one writer at a time drains them in that order.
 func (a *App) send(data []byte) tea.Cmd {
-	in, done := a.in, a.done
-	if len(data) == 0 || in == nil {
+	if len(data) == 0 || a.pty == nil {
 		return nil
 	}
+
+	a.mu.Lock()
+	a.pending = append(a.pending, data)
+	idle := !a.writing
+	a.writing = true
+	a.mu.Unlock()
+
+	if !idle {
+		return nil
+	}
+	return a.writeCmd()
+}
+
+// writeCmd drains the queue in one go. It keeps the writer busy while keys keep
+// arriving and only hands the role back once nothing is left.
+func (a *App) writeCmd() tea.Cmd {
+	terminal, done := a.pty, a.done
+
 	return func() tea.Msg {
-		select {
-		case in <- data:
-		case <-done:
+		for {
+			a.mu.Lock()
+			batch := a.pending
+			a.pending = nil
+			if len(batch) == 0 {
+				a.writing = false
+				a.mu.Unlock()
+				return writtenMsg{}
+			}
+			a.mu.Unlock()
+
+			for _, chunk := range batch {
+				if _, err := terminal.Write(chunk); err != nil {
+					a.mu.Lock()
+					a.writing = false
+					a.mu.Unlock()
+					return failureMsg{err: err}
+				}
+			}
+
+			select {
+			case <-done:
+				a.mu.Lock()
+				a.writing = false
+				a.mu.Unlock()
+				return writtenMsg{}
+			default:
+			}
 		}
-		return writtenMsg{}
 	}
 }
 
@@ -447,20 +494,6 @@ func (a *App) readPump() {
 		}
 		if err != nil {
 			close(out)
-			return
-		}
-	}
-}
-
-func (a *App) writePump() {
-	terminal, in, done := a.pty, a.in, a.done
-	for {
-		select {
-		case data := <-in:
-			if _, err := terminal.Write(data); err != nil {
-				return
-			}
-		case <-done:
 			return
 		}
 	}
