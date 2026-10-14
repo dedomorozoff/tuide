@@ -89,6 +89,55 @@ func TestFindSeesEveryWorkspace(t *testing.T) {
 	}
 }
 
+func TestRevealFollowsTheWindowToItsWorkspace(t *testing.T) {
+	m := newManager()
+	a, _ := m.Open(spec("a"))
+	b, _ := m.Open(spec("b"))
+	_ = b
+
+	if err := m.MoveToWorkspace(a.ID, 4); err != nil {
+		t.Fatalf("MoveToWorkspace: %v", err)
+	}
+	if m.Active() != 0 {
+		t.Fatalf("Active() = %d, want the manager to stay on the first workspace", m.Active())
+	}
+
+	if err := m.Reveal(a.ID); err != nil {
+		t.Fatalf("Reveal: %v", err)
+	}
+	if m.Active() != 4 {
+		t.Errorf("Active() = %d, want the revealed window's workspace", m.Active())
+	}
+	if m.Focused() != a {
+		t.Error("Reveal should focus the window it was asked for")
+	}
+}
+
+func TestRevealStaysPutWhenTheWindowIsAlreadyHere(t *testing.T) {
+	m := newManager()
+	a, _ := m.Open(spec("a"))
+	if _, err := m.Open(spec("b")); err != nil {
+		t.Fatalf("Open b: %v", err)
+	}
+
+	if err := m.Reveal(a.ID); err != nil {
+		t.Fatalf("Reveal: %v", err)
+	}
+	if m.Active() != 0 {
+		t.Errorf("Active() = %d, want the workspace unchanged", m.Active())
+	}
+	if m.Focused() != a {
+		t.Errorf("focus = %v, want %v", m.Focused(), a)
+	}
+}
+
+func TestRevealRejectsUnknownWindow(t *testing.T) {
+	m := newManager()
+	if err := m.Reveal("nope"); err == nil {
+		t.Error("revealing a window that does not exist should fail")
+	}
+}
+
 func TestToggleMinimizedSkipsToAnotherWorkspaceWindow(t *testing.T) {
 	m := newManager()
 	a, _ := m.Open(spec("a"))

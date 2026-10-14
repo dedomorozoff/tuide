@@ -226,6 +226,21 @@ func (m *Manager) FocusLast() bool {
 	return false
 }
 
+// Reveal focuses a window wherever it lives, switching to its workspace first
+// so the user can actually see what took the keyboard.
+func (m *Manager) Reveal(id string) error {
+	w := m.Find(id)
+	if w == nil {
+		return fmt.Errorf("wm: reveal %s: %w", id, ErrNoWindow)
+	}
+	if w.Workspace != m.active {
+		if err := m.SetWorkspace(w.Workspace); err != nil {
+			return err
+		}
+	}
+	return m.Focus(id)
+}
+
 // Cycle moves focus through the visible windows of the active workspace.
 func (m *Manager) Cycle(step int) {
 	visible := m.visible()

@@ -317,7 +317,9 @@ func (m *Model) launch(id string) tea.Cmd {
 		return nil
 	}
 	if existing := m.windows.Find(id); existing != nil {
-		m.focus(existing.ID)
+		if err := m.windows.Reveal(existing.ID); err != nil {
+			m.lastErr = err
+		}
 		return nil
 	}
 	w, err := m.windows.Open(spec)

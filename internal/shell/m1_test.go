@@ -173,6 +173,35 @@ func TestMoveToWorkspaceKeyFollowsWindow(t *testing.T) {
 	}
 }
 
+func TestLaunchingAnOpenWindowFollowsItToItsWorkspace(t *testing.T) {
+	m := newMultiDesktop("a", "b")
+	_ = m.Init()
+
+	if err := m.windows.Focus("a"); err != nil {
+		t.Fatalf("Focus: %v", err)
+	}
+	press(t, m, tea.Key{Code: '2', Mod: tea.ModCtrl | tea.ModAlt | tea.ModShift})
+	if m.windows.Active() != 1 {
+		t.Fatalf("active workspace = %d, want 1", m.windows.Active())
+	}
+	press(t, m, tea.Key{Code: '1', Mod: tea.ModCtrl | tea.ModAlt})
+	if m.windows.Active() != 0 {
+		t.Fatalf("active workspace = %d, want 0", m.windows.Active())
+	}
+
+	m.launch("a")
+
+	if m.windows.Active() != 1 {
+		t.Errorf("active workspace = %d, want the one holding the window", m.windows.Active())
+	}
+	if focused := m.windows.Focused(); focused == nil || focused.ID != "a" {
+		t.Errorf("focus = %v, want the window that was already open", focused)
+	}
+	if m.windows.Count() != 1 {
+		t.Errorf("launching an open app must not open a second window, got %d", m.windows.Count())
+	}
+}
+
 func TestLayoutKeyTogglesTiling(t *testing.T) {
 	m := newMultiDesktop("a", "b", "c")
 	_ = m.Init()
