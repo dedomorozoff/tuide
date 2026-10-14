@@ -38,12 +38,13 @@ type dragState struct {
 func (d dragState) active() bool { return d.kind != dragNone }
 
 // onClick focuses the window under the cursor and begins a drag when the click
-// landed on the title bar or a resize edge. Taskbar clicks toggle the launcher
-// and window buttons, and a click on the open launcher runs the row it hit.
+// landed on the title bar or a resize edge. Taskbar clicks open the launcher,
+// focus or minimize a window and, on the middle button, close it. A click on
+// the open launcher runs the row it hit.
 func (m *Model) onClick(msg tea.MouseClickMsg) tea.Cmd {
 	mouse := msg.Mouse()
 	m.tabbing = false
-	if !m.options.Mouse || mouse.Button != tea.MouseLeft {
+	if !m.options.Mouse {
 		return m.consumeMouse(msg, mouse)
 	}
 
@@ -51,10 +52,16 @@ func (m *Model) onClick(msg tea.MouseClickMsg) tea.Cmd {
 		return m.onLauncherClick(mouse)
 	}
 
+	// The taskbar answers the middle button as well, so it is consulted before
+	// the check that sends every other button to the focused app.
 	if m.options.Taskbar {
-		if cmd := m.onTaskbarClick(mouse); cmd != nil || m.launcher.open {
+		if cmd, handled := m.onTaskbarClick(mouse); handled {
 			return cmd
 		}
+	}
+
+	if mouse.Button != tea.MouseLeft {
+		return m.consumeMouse(msg, mouse)
 	}
 
 	w, region, edges := m.windows.RegionAt(mouse.X, mouse.Y)
@@ -182,32 +189,55 @@ func (m *Model) onMotion(msg tea.MouseMotionMsg) tea.Cmd {
 	return nil
 }
 
-// onTaskbarClick handles the start button and the window buttons. It reports
-// whether the click landed on the taskbar at all.
-func (m *Model) onTaskbarClick(mouse tea.Mouse) tea.Cmd {
+// onTaskbarClick handles the start button and the window buttons. The left
+// button opens the launcher, focuses a window or minimizes the focused one; the
+// middle button closes the window behind it. It reports whether the click
+// landed on the taskbar at all.
+func (m *Model) onTaskbarClick(mouse tea.Mouse) (tea.Cmd, bool) {
 	y := max(0, m.height-TaskbarHeight)
 	if mouse.Y != y || mouse.X < 0 || mouse.X >= m.width {
-		return nil
+		return nil, false
 	}
 
 	for _, item := range m.taskbarItems() {
 		if !item.rect.Contains(mouse.X, mouse.Y) {
 			continue
 		}
-		switch {
-		case item.id == "start":
-			m.openLauncher(launcherApps)
-		case item.id == "clock" || item.id == "hint":
-		default:
-			if w := m.windows.Find(item.id); w != nil {
-				if w == m.windows.Focused() && w.State != wm.Minimized {
-					m.toggleMinimized(w.ID)
-					return nil
-				}
-				m.focus(w.ID)
-			}
+		return m.taskbarItemClick(item.id, mouse.Button), true
+	}
+	return nil, false
+}
+
+// taskbarItemClick runs the command one taskbar element stands for. Only the
+// window buttons answer both buttons: everywhere else the middle one does
+// nothing at all rather than closing something the user did not point at.
+func (m *Model) taskbarItemClick(id string, button tea.MouseButton) tea.Cmd {
+	w := m.windows.Find(id)
+
+	if button == tea.MouseMiddle {
+		if w == nil {
+			return nil
 		}
+		delete(m.snapLast, w.ID)
+		return m.windows.Close(w.ID)
+	}
+	if button != tea.MouseLeft {
 		return nil
+	}
+
+	switch {
+	case id == "start":
+		m.openLauncher(launcherApps)
+	case id == "clock" || id == "status":
+	default:
+		if w == nil {
+			return nil
+		}
+		if w == m.windows.Focused() && w.State != wm.Minimized {
+			m.toggleMinimized(w.ID)
+			return nil
+		}
+		m.focus(w.ID)
 	}
 	return nil
 }

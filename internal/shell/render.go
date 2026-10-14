@@ -1,7 +1,6 @@
 package shell
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -12,8 +11,6 @@ import (
 	"github.com/dedomorozoff/tuide/internal/theme"
 	"github.com/dedomorozoff/tuide/internal/wm"
 )
-
-const hint = " ctrl+alt+q quit "
 
 // startLabel is the taskbar's menu button; clicking it opens the launcher.
 const startLabel = "≡ start"
@@ -58,8 +55,8 @@ func (m *Model) drawTaskbar() {
 }
 
 // taskbarItem is one element of the taskbar: the start button, a window
-// button, the clock or the hint. Drawing and hit-testing share the layout so
-// they can never disagree.
+// button, the clock or the status indicators. Drawing and hit-testing share the
+// layout so they can never disagree.
 type taskbarItem struct {
 	id    string
 	label string
@@ -67,10 +64,9 @@ type taskbarItem struct {
 }
 
 // taskbarItems places every element on the bar. Window buttons that would not
-// fit next to the clock and hint are dropped.
+// fit next to the clock and the indicators are dropped.
 func (m *Model) taskbarItems() []taskbarItem {
 	y := max(0, m.height-TaskbarHeight)
-	hintWidth := lipgloss.Width(hint)
 
 	startStyle := m.styles.TaskbarItem
 	if m.launcher.open {
@@ -88,7 +84,8 @@ func (m *Model) taskbarItems() []taskbarItem {
 	focused := m.windows.Focused()
 	indicators := m.statusIndicators()
 	indWidth := lipgloss.Width(indicators)
-	rightWidth := indWidth + lipgloss.Width(m.clockText()) + hintWidth
+	clockWidth := lipgloss.Width(m.clockText())
+	rightWidth := indWidth + clockWidth
 	for _, w := range m.taskbarWindows() {
 		style := m.styles.TaskbarItem
 		if w == focused {
@@ -112,21 +109,14 @@ func (m *Model) taskbarItems() []taskbarItem {
 		items = append(items, taskbarItem{
 			id:    "status",
 			label: indicators,
-			rect:  geom.Rect{X: max(0, m.width-hintWidth-lipgloss.Width(clock)-indWidth), Y: y, Width: indWidth, Height: TaskbarHeight},
+			rect:  geom.Rect{X: max(0, m.width-clockWidth-indWidth), Y: y, Width: indWidth, Height: TaskbarHeight},
 		})
 	}
-	items = append(items,
-		taskbarItem{
-			id:    "clock",
-			label: clock,
-			rect:  geom.Rect{X: max(0, m.width-hintWidth-lipgloss.Width(clock)), Y: y, Width: lipgloss.Width(clock), Height: TaskbarHeight},
-		},
-		taskbarItem{
-			id:    "hint",
-			label: m.styles.TaskbarText.Render(hint),
-			rect:  geom.Rect{X: max(0, m.width-hintWidth), Y: y, Width: hintWidth, Height: TaskbarHeight},
-		},
-	)
+	items = append(items, taskbarItem{
+		id:    "clock",
+		label: clock,
+		rect:  geom.Rect{X: max(0, m.width-clockWidth), Y: y, Width: clockWidth, Height: TaskbarHeight},
+	})
 	return items
 }
 
@@ -134,13 +124,6 @@ func (m *Model) statusIndicators() string {
 	var parts []string
 	if m.netOnline {
 		parts = append(parts, "online")
-	}
-	if m.batteryKnown {
-		icon := "bat"
-		if m.batteryCharging {
-			icon = "chg"
-		}
-		parts = append(parts, fmt.Sprintf("%s:%d%%", icon, m.batteryPercent))
 	}
 	if len(parts) == 0 {
 		return ""

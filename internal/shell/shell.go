@@ -72,12 +72,6 @@ type Model struct {
 	netOnline bool
 	// netTick counts ticks to throttle connectivity probes.
 	netTick int
-	// batteryPercent is the last known charge percentage.
-	batteryPercent int
-	// batteryCharging reports if connected to AC power.
-	batteryCharging bool
-	// batteryKnown reports if a system battery is present.
-	batteryKnown bool
 }
 
 // New builds the desktop from a palette, a set of launchable apps and options.
@@ -136,7 +130,7 @@ func (m *Model) Init() tea.Cmd {
 			cmds = append(cmds, cmd)
 		}
 	}
-	cmds = append(cmds, tickCmd(), probeNetCmd, probeBatteryCmd)
+	cmds = append(cmds, tickCmd(), probeNetCmd)
 	return tea.Batch(cmds...)
 }
 
@@ -163,19 +157,10 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.netTick%30 == 0 {
 			cmds = append(cmds, probeNetCmd)
 		}
-		if m.netTick%5 == 0 {
-			cmds = append(cmds, probeBatteryCmd)
-		}
 		return m, tea.Batch(cmds...)
 
 	case netMsg:
 		m.netOnline = bool(msg)
-		return m, nil
-
-	case batteryMsg:
-		m.batteryPercent = msg.percent
-		m.batteryCharging = msg.charging
-		m.batteryKnown = msg.available
 		return m, nil
 
 	case appsdk.RequestConfig:
@@ -294,13 +279,6 @@ type tickMsg time.Time
 // netMsg carries connectivity status.
 type netMsg bool
 
-// batteryMsg carries battery status.
-type batteryMsg struct {
-	percent   int
-	charging  bool
-	available bool
-}
-
 // tickCmd schedules the next clock tick.
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(now time.Time) tea.Msg { return tickMsg(now) })
@@ -308,11 +286,6 @@ func tickCmd() tea.Cmd {
 
 func probeNetCmd() tea.Msg {
 	return netMsg(sys.Online())
-}
-
-func probeBatteryCmd() tea.Msg {
-	pct, chg, avail := sys.Battery()
-	return batteryMsg{percent: pct, charging: chg, available: avail}
 }
 
 // resize applies a new terminal size.

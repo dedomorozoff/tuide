@@ -11,6 +11,7 @@ import (
 )
 
 var (
+	kernel32                     = syscall.NewLazyDLL("kernel32.dll")
 	kernel32GetSystemTimes       = kernel32.NewProc("GetSystemTimes")
 	kernel32GlobalMemoryStatusEx = kernel32.NewProc("GlobalMemoryStatusEx")
 	psapiGetProcessMemoryInfo    = syscall.NewLazyDLL("psapi.dll").NewProc("GetProcessMemoryInfo")

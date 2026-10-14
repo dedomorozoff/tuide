@@ -279,6 +279,96 @@ func TestTaskbarButtonClickFocusesAndMinimizes(t *testing.T) {
 	}
 }
 
+func TestTaskbarMiddleClickClosesWindow(t *testing.T) {
+	m := newMultiDesktop("a", "b")
+	_ = m.Init()
+
+	target := m.windows.Windows()[0]
+	m.Update(tea.MouseClickMsg(tea.Mouse{
+		X:      taskbarButtonX(t, m, target.ID),
+		Y:      m.height - TaskbarHeight,
+		Button: tea.MouseMiddle,
+	}))
+
+	if m.windows.Find(target.ID) != nil {
+		t.Error("a middle click on a window button should close that window")
+	}
+	if m.windows.Count() != 1 {
+		t.Errorf("the other window must survive, got %d windows", m.windows.Count())
+	}
+}
+
+func TestTaskbarMiddleClickOnStartDoesNothing(t *testing.T) {
+	m := newMultiDesktop("a")
+	_ = m.Init()
+
+	m.Update(tea.MouseClickMsg(tea.Mouse{
+		X:      m.startRect().X + 1,
+		Y:      m.height - TaskbarHeight,
+		Button: tea.MouseMiddle,
+	}))
+
+	if m.windows.Count() != 1 {
+		t.Errorf("the middle button must not close a window, got %d", m.windows.Count())
+	}
+	if m.launcher.open {
+		t.Error("only the left button opens the launcher")
+	}
+}
+
+func TestTaskbarMiddleClickOnTheBarMissesWindows(t *testing.T) {
+	m := newMultiDesktop("a")
+	_ = m.Init()
+
+	gap, ok := taskbarGapX(t, m)
+	if !ok {
+		t.Skip("the taskbar has no bare column at this width")
+	}
+
+	m.Update(tea.MouseClickMsg(tea.Mouse{
+		X:      gap,
+		Y:      m.height - TaskbarHeight,
+		Button: tea.MouseMiddle,
+	}))
+
+	if m.windows.Count() != 1 {
+		t.Errorf("a click on bare taskbar must not close anything, got %d", m.windows.Count())
+	}
+}
+
+// taskbarButtonX is the middle of one taskbar element, so a test does not have
+// to guess which column the layout put it in.
+func taskbarButtonX(t *testing.T, m *Model, id string) int {
+	t.Helper()
+	for _, item := range m.taskbarItems() {
+		if item.id == id {
+			return item.rect.X + item.rect.Width/2
+		}
+	}
+	t.Fatalf("the taskbar has no %q button", id)
+	return 0
+}
+
+// taskbarGapX finds a column of the taskbar row that belongs to no element.
+func taskbarGapX(t *testing.T, m *Model) (int, bool) {
+	t.Helper()
+
+	items := m.taskbarItems()
+	for x := 0; x < m.width; x++ {
+		covered := false
+		for _, item := range items {
+			if item.rect.Contains(x, m.height-TaskbarHeight) {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			return x, true
+		}
+	}
+	return 0, false
+}
+
 func TestClickOutsideTaskbarIsNotATaskbarClick(t *testing.T) {
 	m := newMultiDesktop("a")
 	_ = m.Init()
