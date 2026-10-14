@@ -39,7 +39,7 @@ func (d dragState) active() bool { return d.kind != dragNone }
 
 // onClick focuses the window under the cursor and begins a drag when the click
 // landed on the title bar or a resize edge. Taskbar clicks toggle the launcher
-// and window buttons.
+// and window buttons, and a click on the open launcher runs the row it hit.
 func (m *Model) onClick(msg tea.MouseClickMsg) tea.Cmd {
 	mouse := msg.Mouse()
 	m.tabbing = false
@@ -48,8 +48,7 @@ func (m *Model) onClick(msg tea.MouseClickMsg) tea.Cmd {
 	}
 
 	if m.launcher.open {
-		m.launcher.open = false
-		return nil
+		return m.onLauncherClick(mouse)
 	}
 
 	if m.options.Taskbar {

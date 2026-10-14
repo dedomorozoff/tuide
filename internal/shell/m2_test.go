@@ -188,6 +188,59 @@ func TestLauncherDoesNotLeakKeysToWindows(t *testing.T) {
 	}
 }
 
+func TestLauncherClickRunsTheRowUnderThePointer(t *testing.T) {
+	m := launcherDesktop()
+
+	press(t, m, tea.Key{Code: tea.KeySpace, Mod: tea.ModCtrl | tea.ModAlt})
+
+	row := launcherRowWithLabel(t, m, "bravo")
+	m.Update(tea.MouseClickMsg(tea.Mouse{
+		X:      row.rect.X + 1,
+		Y:      row.rect.Y,
+		Button: tea.MouseLeft,
+	}))
+
+	if m.launcher.open {
+		t.Error("running a row should close the launcher")
+	}
+	if m.windows.Find("bravo") == nil {
+		t.Fatal("clicking a row should open that app's window")
+	}
+	if m.windows.Focused() == nil {
+		t.Error("the launched window should take the focus")
+	}
+}
+
+func TestLauncherClickOffTheRowsClosesWithoutLaunching(t *testing.T) {
+	m := launcherDesktop()
+
+	press(t, m, tea.Key{Code: tea.KeySpace, Mod: tea.ModCtrl | tea.ModAlt})
+	m.Update(tea.MouseClickMsg(tea.Mouse{
+		X:      1,
+		Y:      1,
+		Button: tea.MouseLeft,
+	}))
+
+	if m.launcher.open {
+		t.Error("a click that misses every row should close the launcher")
+	}
+	if m.windows.Count() != 0 {
+		t.Error("a click off the rows must not start an app")
+	}
+}
+
+// launcherRowWithLabel finds a row the launcher is currently showing.
+func launcherRowWithLabel(t *testing.T, m *Model, label string) launcherRow {
+	t.Helper()
+	for _, row := range m.launcherLayout().rows {
+		if row.label == label {
+			return row
+		}
+	}
+	t.Fatalf("the launcher is not showing a %q row", label)
+	return launcherRow{}
+}
+
 func TestTaskbarStartButtonOpensLauncher(t *testing.T) {
 	m := newMultiDesktop("a")
 	_ = m.Init()

@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/dedomorozoff/tuide/internal/fuzzy"
+	"github.com/dedomorozoff/tuide/internal/geom"
 	"github.com/dedomorozoff/tuide/internal/input"
 )
 
@@ -150,17 +151,42 @@ func (m *Model) launcherKey(msg tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
-// launcherAccept runs the selected entry and closes the overlay.
+// launcherAccept runs the row the keyboard selection is on and closes the
+// overlay. A click on a row goes through the same path.
 func (m *Model) launcherAccept() tea.Cmd {
-	entries := m.launcherEntries()
-	ranked := m.rankLauncher(entries)
-	selected := clampSelection(m.launcher.selected, len(ranked))
-
+	layout := m.launcherLayout()
 	m.launcher.open = false
-	if selected < 0 {
+
+	for _, row := range layout.rows {
+		if row.index == layout.selected {
+			return m.runLauncherRow(row)
+		}
+	}
+	return nil
+}
+
+// runLauncherRow runs one entry by its position in the entry list.
+func (m *Model) runLauncherRow(row launcherRow) tea.Cmd {
+	entries := m.launcherEntries()
+	if row.entry < 0 || row.entry >= len(entries) {
 		return nil
 	}
-	return entries[ranked[selected]].run()
+	return entries[row.entry].run()
+}
+
+// onLauncherClick runs the row the pointer is on. A click that lands on the
+// title, the prompt or the frame around the overlay dismisses it without
+// running anything, the same as esc.
+func (m *Model) onLauncherClick(mouse tea.Mouse) tea.Cmd {
+	layout := m.launcherLayout()
+	m.launcher.open = false
+
+	for _, row := range layout.rows {
+		if row.rect.Contains(mouse.X, mouse.Y) {
+			return m.runLauncherRow(row)
+		}
+	}
+	return nil
 }
 
 // launcherMove steps the selection through the filtered rows, wrapping around.
@@ -177,9 +203,37 @@ func (m *Model) launcherMove(up bool) {
 	m.launcher.selected = (selected + delta + len(ranked)) % len(ranked)
 }
 
-// drawLauncher paints the overlay: a prompt with the query and the filtered
-// rows, best match first.
-func (m *Model) drawLauncher() {
+// launcherRow is one visible entry of the overlay together with the rectangle
+// of cells it occupies.
+type launcherRow struct {
+	label string
+	// entry indexes the entry list, index positions the row in the ranked
+	// list. The keyboard selection is an index, a click is a rectangle.
+	entry    int
+	index    int
+	selected bool
+	rect     geom.Rect
+}
+
+// launcherLayout is the overlay in one value: the content to render, where the
+// panel lands and which cells each row owns. Drawing and click handling share
+// it, so a click always agrees with what is on screen.
+type launcherLayout struct {
+	content string
+	rect    geom.Rect
+	rows    []launcherRow
+	// selected is the keyboard selection as a position in the ranked list, or
+	// -1 when the query matches nothing.
+	selected int
+}
+
+// launcherFirstRow is the content line the rows start on: title, blank, prompt,
+// blank.
+const launcherFirstRow = 4
+
+// launcherLayout builds the overlay: the filtered rows, the string to render
+// and the cells those rows occupy.
+func (m *Model) launcherLayout() launcherLayout {
 	entries := m.launcherEntries()
 	ranked := m.rankLauncher(entries)
 	selected := clampSelection(m.launcher.selected, len(ranked))
@@ -196,6 +250,8 @@ func (m *Model) drawLauncher() {
 		"",
 	}
 
+	layout := launcherLayout{selected: selected}
+
 	if selected < 0 {
 		lines = append(lines, m.styles.Hint.Render("no matches"))
 	} else {
@@ -206,6 +262,12 @@ func (m *Model) drawLauncher() {
 		}
 		for i := start; i < min(len(ranked), start+rows); i++ {
 			label := entries[ranked[i]].label
+			layout.rows = append(layout.rows, launcherRow{
+				label:    label,
+				entry:    ranked[i],
+				index:    i,
+				selected: i == selected,
+			})
 			if i == selected {
 				lines = append(lines, m.styles.Selection.Render("› "+label))
 				continue
@@ -215,7 +277,25 @@ func (m *Model) drawLauncher() {
 	}
 
 	lines = append(lines, "", m.styles.Hint.Render("enter run · esc cancel · ↑↓ move"))
-	m.drawPanel(strings.Join(lines, "\n"))
+	layout.content = strings.Join(lines, "\n")
+	layout.rect = m.panelRect(layout.content)
+
+	for i := range layout.rows {
+		layout.rows[i].rect = geom.Rect{
+			X:      layout.rect.X + panelInset,
+			Y:      layout.rect.Y + panelInset + launcherFirstRow + i,
+			Width:  max(0, layout.rect.Width-2*panelInset),
+			Height: 1,
+		}
+	}
+	return layout
+}
+
+// drawLauncher paints the overlay: a prompt with the query and the filtered
+// rows, best match first.
+func (m *Model) drawLauncher() {
+	layout := m.launcherLayout()
+	m.screen.Blit(layout.rect, m.panelStyle().Render(layout.content))
 }
 
 // launcherPrompt is the query line with a block cursor behind it.

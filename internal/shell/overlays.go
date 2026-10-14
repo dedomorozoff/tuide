@@ -79,18 +79,28 @@ func (m *Model) drawInspector() {
 // drawPanel centres a box on the screen. Every overlay goes through it so they
 // share one look and one placement rule.
 func (m *Model) drawPanel(content string) {
+	rect := m.panelRect(content)
+	m.screen.Blit(rect, m.panelStyle().Render(content))
+}
+
+// panelInset is how far the panel's own frame pushes its content inwards: one
+// cell for the border, one for the padding.
+const panelInset = 2
+
+// panelRect is where drawPanel puts a box of this content. An overlay that has
+// to know where its own rows landed asks here instead of guessing.
+func (m *Model) panelRect(content string) geom.Rect {
 	box := m.panelStyle().Render(content)
 
 	width := min(lipgloss.Width(box), m.width)
 	height := min(lipgloss.Height(box), m.height)
 
-	rect := geom.Rect{
+	return geom.Rect{
 		X:      max(0, (m.width-width)/2),
 		Y:      max(0, (m.height-height)/2),
 		Width:  width,
 		Height: height,
 	}
-	m.screen.Blit(rect, box)
 }
 
 func (m *Model) panelStyle() lipgloss.Style {
