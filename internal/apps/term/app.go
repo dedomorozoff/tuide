@@ -83,12 +83,15 @@ func New(t theme.Theme) *App {
 }
 
 // Init implements appsdk.App. Starting the child process is I/O, so it happens
-// in a command and reports back.
+// in a command and reports back. The size is read here, on the update
+// goroutine, and carried into the command by value: the command runs beside
+// Update, so reaching back into the app for the width would race a resize.
 func (a *App) Init() tea.Cmd {
+	width, height := a.width, a.height
 	return func() tea.Msg {
 		terminal, err := sys.StartPTY(sys.PTYOptions{
-			Width:  a.width,
-			Height: a.height,
+			Width:  width,
+			Height: height,
 		})
 		return startedMsg{terminal: terminal, err: err}
 	}
