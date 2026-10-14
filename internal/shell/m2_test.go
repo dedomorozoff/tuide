@@ -552,13 +552,13 @@ func TestConfigRequestAndSave(t *testing.T) {
 
 	// 2. SaveConfig
 	newCfg := config.Config{
-		Theme:   "daylight",
+		Theme:   "nord",
 		Taskbar: false,
 		Mouse:   false,
 	}
 	_, cmd = m.Update(appsdk.SaveConfig{Config: newCfg})
-	if m.styles.Theme.Name != "daylight" {
-		t.Errorf("expected daylight theme applied immediately, got %q", m.styles.Theme.Name)
+	if m.styles.Theme.Name != "nord" {
+		t.Errorf("expected nord theme applied immediately, got %q", m.styles.Theme.Name)
 	}
 	if m.options.Taskbar != false {
 		t.Errorf("expected taskbar disabled, got %v", m.options.Taskbar)

@@ -266,7 +266,7 @@ TUI-программы на Windows деградируют до строчног
 - Дополнительные раскладки тайлинга: vertical split, horizontal split, grid
   (сейчас только master-stack).
 - Командная строка DE — режим `:` как в tmux/vim: `:new term`,
-  `:set theme daylight`, `:kill`.
+  `:set theme nord`, `:kill`.
 - Trей / system tray для фоновых приложений.
 
 ### M6 — Дистрибуция и инфраструктура
