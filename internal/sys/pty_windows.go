@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf16"
 	"unsafe"
 
@@ -17,6 +18,68 @@ import (
 // procThreadAttributePseudoConsole is ProcThreadAttributePseudoConsole. The
 // Windows headers define it, but the Go bindings do not.
 const procThreadAttributePseudoConsole = 0x00020016
+
+// ptyTransport names the two ways a child process can be given a terminal on
+// Windows. TUIDE_PTY forces one; otherwise the pseudoconsole is probed once.
+const (
+	ptyTransportConPTY = "conpty"
+	ptyTransportPipes  = "pipes"
+)
+
+// ptyTransportVar overrides the transport, which is the only way to test the
+// pseudoconsole on a host where it is known to be broken.
+const ptyTransportVar = "TUIDE_PTY"
+
+// conptyProbeTimeout is how long the transport probe waits for its throwaway
+// child.
+const conptyProbeTimeout = 3 * time.Second
+
+// conptyUsable is decided once per process: a machine where the pseudoconsole
+// works must not pay for the probe on every terminal window, and a machine
+// where it does not must not keep paying for it either.
+var conptyUsable = sync.OnceValue(func() bool {
+	return resolveConPTY(os.Getenv(ptyTransportVar))
+})
+
+// resolveConPTY is the transport decision behind the cache: the environment
+// variable wins, otherwise a throwaway child says whether the pseudoconsole
+// really works.
+func resolveConPTY(override string) bool {
+	switch strings.ToLower(strings.TrimSpace(override)) {
+	case ptyTransportPipes:
+		return false
+	case ptyTransportConPTY:
+		return true
+	}
+	return probeConPTY()
+}
+
+// probeConPTY starts a child on a pseudoconsole and watches it finish. Hosts
+// where the pseudoconsole cannot host a session kill the child at DLL init and
+// the terminal would stay empty forever, so the child exiting cleanly is the
+// signal that the real transport will work.
+func probeConPTY() bool {
+	shell := os.Getenv("COMSPEC")
+	if shell == "" {
+		shell = "cmd.exe"
+	}
+
+	terminal, err := startConPTY(PTYOptions{
+		Command: []string{shell, "/c", "exit", "0"},
+		Width:   80,
+		Height:  24,
+	})
+	if err != nil {
+		return false
+	}
+	defer func() { _ = terminal.Close() }()
+
+	client, ok := terminal.(*windowsPTY)
+	if !ok {
+		return true
+	}
+	return client.exitCode(conptyProbeTimeout) == 0
+}
 
 // windowsPTY is a ConPTY session: a pseudoconsole handle with the pipes that
 // carry bytes to and from the client process.
@@ -32,8 +95,19 @@ type windowsPTY struct {
 	closed bool
 }
 
-// startPTY creates the pseudoconsole and the client process attached to it.
+// startPTY creates the terminal. A working pseudoconsole is the better
+// transport, so it is tried first; a host that cannot host one would leave the
+// window permanently blank, so the probe falls back to plain pipes instead.
 func startPTY(options PTYOptions) (PTY, error) {
+	if !conptyUsable() {
+		return startPipesPTY(options)
+	}
+	return startConPTY(options)
+}
+
+// startConPTY creates a ConPTY session: a pseudoconsole handle with the pipes
+// that carry bytes to and from the client process.
+func startConPTY(options PTYOptions) (PTY, error) {
 	input, output, console, err := createConsole(options.Width, options.Height)
 	if err != nil {
 		return nil, err
@@ -114,16 +188,7 @@ func spawnWithConsole(command []string, dir string, env []string, console window
 		ProcThreadAttributeList: attributes.List(),
 	}
 
-	executable, err := windows.UTF16PtrFromString(command[0])
-	if err != nil {
-		return 0, 0, fmt.Errorf("sys: pty: command name: %w", err)
-	}
-	line, err := windows.UTF16PtrFromString(windows.ComposeCommandLine(command[1:]))
-	if err != nil {
-		return 0, 0, fmt.Errorf("sys: pty: command line: %w", err)
-	}
-	environment := utf16Block(env)
-	workingDir, err := wideDir(dir)
+	executable, line, environment, workingDir, err := childParams(command, dir, env)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -139,6 +204,27 @@ func spawnWithConsole(command []string, dir string, env []string, console window
 		return 0, 0, fmt.Errorf("sys: pty: start %s: %w", command[0], err)
 	}
 	return info.Process, info.Thread, nil
+}
+
+// childParams prepares what CreateProcess needs to start the client: the
+// executable, the composed command line, the UTF-16 environment block and the
+// working directory. Both Windows transports start the same child, only the
+// handles around it differ.
+func childParams(command []string, dir string, env []string) (exe, line, environment, workingDir *uint16, err error) {
+	exe, err = windows.UTF16PtrFromString(command[0])
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("sys: pty: command name: %w", err)
+	}
+	line, err = windows.UTF16PtrFromString(windows.ComposeCommandLine(command[1:]))
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("sys: pty: command line: %w", err)
+	}
+	environment = utf16Block(childEnv(env))
+	workingDir, err = wideDir(dir)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	return exe, line, environment, workingDir, nil
 }
 
 // childEnv is the environment block for the client process: the desktop's
@@ -216,6 +302,22 @@ func (p *windowsPTY) Alive() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.alive
+}
+
+// exitCode waits up to timeout for the client and reports how it ended. A child
+// still running when the wait is over, or one that could not be queried, is
+// reported as 1 so a broken session never reads as a successful probe.
+func (p *windowsPTY) exitCode(timeout time.Duration) uint32 {
+	event, err := windows.WaitForSingleObject(p.process, uint32(timeout.Milliseconds()))
+	if err != nil || event != uint32(windows.WAIT_OBJECT_0) {
+		return 1
+	}
+
+	var code uint32
+	if err := windows.GetExitCodeProcess(p.process, &code); err != nil {
+		return 1
+	}
+	return code
 }
 
 // Close implements PTY.

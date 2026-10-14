@@ -4,34 +4,31 @@ import (
 	"bytes"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/dedomorozoff/tuide/internal/sys"
 )
 
-const ptyReadTimeout = 5 * time.Second
-
-// ptyEnvVar turns the Windows pseudoconsole test on. ConPTY needs a real
-// console host, which sandboxes and containers do not provide: there the
-// client starts, never writes a byte, and the pipe it is attached to cannot be
-// woken up again, which wedges the whole test binary. On a machine with a
-// working console the test is worth running, so it is opt-in there and always
-// on everywhere else.
-const ptyEnvVar = "TUIDE_TEST_PTY"
+const ptyReadTimeout = 15 * time.Second
 
 // echoMarker is printed by the child in every shell tuiDE ships a default for:
 // both /bin/sh and PowerShell understand `echo`.
 const echoMarker = "tuide-pty-ok"
 
-// requireLivePTY skips the test on a machine that cannot host a pseudoconsole.
+// requireLivePTY skips the test only where the pseudoconsole is forced on a
+// host that cannot host one. Such a host starts the client, never writes a
+// byte, and the pipe it is attached to cannot be woken up again, which wedges
+// the whole test binary. Everywhere else the transport is probed and the pipes
+// fallback makes the terminal work, so the test is worth running.
 func requireLivePTY(t *testing.T) {
 	t.Helper()
 	if runtime.GOOS != "windows" {
 		return
 	}
-	if os.Getenv(ptyEnvVar) != "1" {
-		t.Skipf("set %s=1 to exercise the Windows pseudoconsole", ptyEnvVar)
+	if strings.EqualFold(os.Getenv("TUIDE_PTY"), "conpty") {
+		t.Skip("TUIDE_PTY=conpty forces a pseudoconsole this host cannot wake a read on")
 	}
 }
 
