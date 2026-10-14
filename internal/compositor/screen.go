@@ -115,6 +115,36 @@ func (s *Screen) Blit(rect geom.Rect, content string) {
 	}
 }
 
+// BlitCells paints a prepared row of cells starting at the rectangle origin.
+// The terminal uses it to hand over a whole screen row without a string ever
+// being built for it, so the rectangle is one row tall. Cells past the right
+// edge are dropped; anything clipped off the left is skipped.
+func (s *Screen) BlitCells(rect geom.Rect, cells []Cell) {
+	if rect.Height <= 0 {
+		return
+	}
+	area := geom.Rect{
+		X:      max(rect.X, 0),
+		Y:      rect.Y,
+		Width:  min(rect.X+rect.Width, s.width) - max(rect.X, 0),
+		Height: 1,
+	}
+	if area.Width <= 0 {
+		return
+	}
+
+	x := rect.X
+	for _, cell := range cells {
+		if x >= area.X+area.Width {
+			break
+		}
+		if x >= area.X {
+			s.write(x, rect.Y, cell)
+		}
+		x += max(1, cell.Width)
+	}
+}
+
 // write paints a grapheme and reserves the remaining cells of wide characters.
 func (s *Screen) write(x, y int, cell Cell) {
 	s.Set(x, y, cell)
