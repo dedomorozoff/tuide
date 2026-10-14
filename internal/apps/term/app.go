@@ -322,16 +322,18 @@ func (a *App) onKey(msg tea.KeyPressMsg) tea.Cmd {
 // program or the start of a text selection.
 func (a *App) onMouse(mouse tea.Mouse, press bool) tea.Cmd {
 	x, y := a.cellOf(mouse)
-	if a.programWantsMouse() {
+
+	// Shift is the escape hatch that hands the pointer back to the host while a
+	// program is tracking it, and a selection already under way keeps the
+	// pointer until the button comes up: press and release must agree, or the
+	// program gets a release for a press it never saw.
+	hostSelect := mouse.Mod&tea.ModShift != 0 || a.term.Selecting()
+	if a.programWantsMouse() && !hostSelect {
 		if press && mouse.Button != tea.MouseLeft {
 			return nil
 		}
 		button := mouseButtonCode(mouse.Button)
 		if button < 0 {
-			return nil
-		}
-		if press && mouse.Mod&tea.ModShift != 0 {
-			// Shift is the usual way to ask for the host to do the copy.
 			return nil
 		}
 		return a.send(encodeMouse(mouseEvent{button: button, x: x, y: y, press: press}, a.term.Modes().Mouse))

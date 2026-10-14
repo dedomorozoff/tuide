@@ -221,6 +221,48 @@ func TestTheTerminalAlwaysOwnsItsBody(t *testing.T) {
 	}
 }
 
+func TestShiftClickSelectsInsteadOfReporting(t *testing.T) {
+	pty := &recordingPTY{}
+	a := newRecordingApp(pty)
+	a.term.Write([]byte("\x1b[?1000h\x1b[?1006h"))
+	a.term.Write([]byte("hello world"))
+	a.rect = geom.Rect{Width: 20, Height: 5}
+
+	a.onMouse(tea.Mouse{X: 0, Y: 0, Button: tea.MouseLeft, Mod: tea.ModShift}, true)
+	if !a.term.Selecting() {
+		t.Fatal("shift click should start a host selection")
+	}
+
+	a.onMotion(tea.Mouse{X: 4, Y: 0})
+	if got := a.term.SelectedText(); got != "hello" {
+		t.Fatalf("selection = %q, want the dragged text", got)
+	}
+
+	a.onMouse(tea.Mouse{X: 4, Y: 0, Button: tea.MouseLeft}, false)
+	if pty.text() != "" {
+		t.Errorf("shift click sent mouse reports to the program: %q", pty.text())
+	}
+	if a.term.Selecting() {
+		t.Error("releasing the button should end the selection")
+	}
+}
+
+func TestProgramMouseReportsStillReachTheChild(t *testing.T) {
+	pty := &recordingPTY{}
+	a := newRecordingApp(pty)
+	a.term.Write([]byte("\x1b[?1000h\x1b[?1006h"))
+	a.rect = geom.Rect{Width: 20, Height: 5}
+
+	cmd := a.onMouse(tea.Mouse{X: 1, Y: 1, Button: tea.MouseLeft}, true)
+	if cmd == nil {
+		t.Fatal("a program tracking the mouse should get a report")
+	}
+	_ = cmd()
+	if got := pty.text(); got != "\x1b[<0;2;2M" {
+		t.Fatalf("press report = %q, want the SGR press", got)
+	}
+}
+
 func TestTitleFallsBackToTheDefault(t *testing.T) {
 	a := New(theme.Get(theme.DefaultName))
 	if a.Title() != "Terminal" {
