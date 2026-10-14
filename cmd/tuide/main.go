@@ -94,22 +94,26 @@ func run(args []string) error {
 }
 
 // runProgram owns the terminal: Bubble Tea takes it over on Run and must be
-// given back before we exit, whatever happens.
+// given back before we exit, whatever happens. Resetting also clears the
+// screen, so the shutdown notice is printed afterwards to stay visible.
 func runProgram(model tea.Model) error {
+	var (
+		final  tea.Model
+		runErr error
+	)
 	defer func() {
 		if err := sys.ResetTerminal(os.Stdout); err != nil {
 			fmt.Fprintln(os.Stderr, "tuide:", err)
 		}
+		if runErr != nil {
+			if desktop, ok := final.(*shell.Model); ok {
+				printShutdownNotice(desktop)
+			}
+		}
 	}()
 
-	final, err := tea.NewProgram(model).Run()
-	if err != nil {
-		if desktop, ok := final.(*shell.Model); ok {
-			printShutdownNotice(desktop)
-		}
-		return fmt.Errorf("tuide: %w", err)
-	}
-	return nil
+	final, runErr = tea.NewProgram(model).Run()
+	return runErr
 }
 
 func printShutdownNotice(m *shell.Model) {
