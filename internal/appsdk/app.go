@@ -5,6 +5,7 @@ package appsdk
 import (
 	"charm.land/bubbletea/v2"
 
+	"github.com/dedomorozoff/tuide/internal/compositor"
 	"github.com/dedomorozoff/tuide/internal/geom"
 	"github.com/dedomorozoff/tuide/internal/theme"
 )
@@ -35,6 +36,32 @@ type App interface {
 
 	// Close releases resources. It returns a command to run after teardown.
 	Close() tea.Cmd
+}
+
+// Named is implemented by apps that choose their own window title once they
+// are running, which the terminal does when the program inside it sets one.
+type Named interface {
+	// Title is the name to show in the title bar.
+	Title() string
+}
+
+// Painter is implemented by apps that draw a prepared grid of cells rather
+// than a string. The terminal does this: a frame of cells is copied straight
+// into the compositor and no styled string is ever built for it.
+type Painter interface {
+	// Paint draws into the rectangle the window manager allocated. It must not
+	// block and must not do I/O.
+	Paint(screen *compositor.Screen, rect geom.Rect)
+}
+
+// MouseConsumer is implemented by apps that take pointer input inside their
+// own window. While one owns the pointer the shell forwards every press,
+// motion and release that lands in the window body and stops turning them
+// into window drags. A terminal does this because a drag across its text is
+// a selection, not a move.
+type MouseConsumer interface {
+	// OwnsPointer reports whether the app is using the pointer right now.
+	OwnsPointer() bool
 }
 
 // Spec describes an application that the launcher can start.

@@ -32,3 +32,11 @@ type SaveConfig struct {
 type ConfigSaved struct {
 	Err error
 }
+
+// Frame is the size of the rectangle a window's app may draw into. The shell
+// sends it whenever that size changes, which is the only moment an app like
+// the terminal learns that its window was resized.
+type Frame struct {
+	Width  int
+	Height int
+}

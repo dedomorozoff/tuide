@@ -38,7 +38,7 @@ func (a App) View(ctx appsdk.Context) tea.View {
 	heading := lipgloss.NewStyle().Foreground(a.Theme.Accent).Render("tuiDE " + a.Theme.Name)
 	body := lipgloss.NewStyle().Foreground(a.Theme.TextDim).Render(
 		fmt.Sprintf("%dx%d cells, focused=%v", ctx.Rect.Width, ctx.Rect.Height, ctx.Focused))
-	hint := lipgloss.NewStyle().Foreground(a.Theme.Text).Render("ctrl+q quit")
+	hint := lipgloss.NewStyle().Foreground(a.Theme.Text).Render("ctrl+alt+q quit")
 
 	return tea.NewView(lipgloss.JoinVertical(
 		lipgloss.Left,

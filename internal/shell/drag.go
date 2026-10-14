@@ -1,8 +1,11 @@
 package shell
 
 import (
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/dedomorozoff/tuide/internal/appsdk"
 	"github.com/dedomorozoff/tuide/internal/geom"
 	"github.com/dedomorozoff/tuide/internal/wm"
 )
@@ -37,10 +40,11 @@ func (d dragState) active() bool { return d.kind != dragNone }
 // onClick focuses the window under the cursor and begins a drag when the click
 // landed on the title bar or a resize edge. Taskbar clicks toggle the launcher
 // and window buttons.
-func (m *Model) onClick(mouse tea.Mouse) tea.Cmd {
+func (m *Model) onClick(msg tea.MouseClickMsg) tea.Cmd {
+	mouse := msg.Mouse()
 	m.tabbing = false
 	if !m.options.Mouse || mouse.Button != tea.MouseLeft {
-		return nil
+		return m.consumeMouse(msg, mouse)
 	}
 
 	if m.launcher.open {
@@ -59,6 +63,36 @@ func (m *Model) onClick(mouse tea.Mouse) tea.Cmd {
 		return nil
 	}
 	m.focus(w.ID)
+
+	// Check if click landed on title buttons [_][^][x]
+	if region == wm.RegionTitle {
+		innerWidth := max(0, w.Rect.Width-2)
+		left := windowLabel(w, true)
+		if innerWidth >= 9 && strings.HasSuffix(left, "[_][^][x]") {
+			// Window inner title starts at w.Rect.X + 1.
+			// The 9 characters "[_][^][x]" end at w.Rect.Right() - 2.
+			ctlStart := w.Rect.Right() - 1 - 9
+			if mouse.X >= ctlStart && mouse.X < w.Rect.Right()-1 {
+				offset := mouse.X - ctlStart
+				switch {
+				case offset >= 0 && offset <= 2: // [_]
+					m.toggleMinimized(w.ID)
+					return nil
+				case offset >= 3 && offset <= 5: // [^]
+					m.toggleMaximized(w.ID)
+					return nil
+				case offset >= 6 && offset <= 8: // [x]
+					return m.windows.Close(w.ID)
+				}
+			}
+		}
+	}
+
+	// A program that tracks the pointer inside the window owns it: the shell
+	// must not turn its clicks into a drag.
+	if region == wm.RegionContent && appOwnsPointer(w) {
+		return m.windows.Update(msg)
+	}
 
 	// Tiled and maximized windows own their geometry, so there is nothing
 	// to drag.
@@ -91,9 +125,29 @@ func (m *Model) onClick(mouse tea.Mouse) tea.Cmd {
 	return nil
 }
 
-func (m *Model) onMotion(mouse tea.Mouse) tea.Cmd {
-	if m.drag.kind == dragNone {
+// consumeMouse hands a non left button press to the focused app when it asked
+// for the pointer, so a program can see right clicks and middle clicks too.
+func (m *Model) consumeMouse(msg tea.MouseMsg, mouse tea.Mouse) tea.Cmd {
+	w := m.windows.Focused()
+	if w == nil || !appOwnsPointer(w) {
 		return nil
+	}
+	if !w.ContentRect().Contains(mouse.X, mouse.Y) {
+		return nil
+	}
+	return m.windows.Update(msg)
+}
+
+// appOwnsPointer reports whether a window's app is using the pointer.
+func appOwnsPointer(w *wm.Window) bool {
+	consumer, ok := w.App.(appsdk.MouseConsumer)
+	return ok && consumer.OwnsPointer()
+}
+
+func (m *Model) onMotion(msg tea.MouseMotionMsg) tea.Cmd {
+	mouse := msg.Mouse()
+	if m.drag.kind == dragNone {
+		return m.consumeMouse(msg, mouse)
 	}
 	if m.windows.Find(m.drag.id) == nil {
 		m.drag = dragState{}
@@ -159,9 +213,10 @@ func (m *Model) onTaskbarClick(mouse tea.Mouse) tea.Cmd {
 	return nil
 }
 
-func (m *Model) onRelease(mouse tea.Mouse) tea.Cmd {
+func (m *Model) onRelease(msg tea.MouseReleaseMsg) tea.Cmd {
+	mouse := msg.Mouse()
 	if m.drag.kind == dragNone {
-		return nil
+		return m.consumeMouse(msg, mouse)
 	}
 
 	id := m.drag.id

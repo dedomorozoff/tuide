@@ -128,3 +128,72 @@ func TestHomeAndEnd(t *testing.T) {
 		t.Errorf("end column = %d, want 3", b.Col())
 	}
 }
+
+func TestDeleteRemovesRuneUnderCursor(t *testing.T) {
+	b := New()
+	b.Insert("abc")
+	b.MoveHome()
+	b.Delete()
+
+	if got := b.String(); got != "bc" {
+		t.Errorf("document = %q, want %q", got, "bc")
+	}
+	if b.Col() != 0 {
+		t.Errorf("column = %d, want 0", b.Col())
+	}
+}
+
+func TestDeleteAtEndOfLineJoinsLines(t *testing.T) {
+	b := New()
+	b.Insert("one")
+	b.Newline()
+	b.Insert("two")
+	b.SetCursor(0, 3)
+	b.Delete()
+
+	if got := b.String(); got != "onetwo" {
+		t.Errorf("document = %q, want %q", got, "onetwo")
+	}
+	if b.Row() != 0 || b.Col() != 3 {
+		t.Errorf("cursor = %d,%d, want 0,3", b.Row(), b.Col())
+	}
+}
+
+func TestDeleteAtEndOfDocumentDoesNothing(t *testing.T) {
+	b := New()
+	b.Insert("x")
+	b.MoveEnd()
+	b.Delete()
+
+	if got := b.String(); got != "x" {
+		t.Errorf("document = %q, want %q", got, "x")
+	}
+}
+
+func TestSetCursorClampsToDocument(t *testing.T) {
+	b := New()
+	b.Insert("hello")
+	b.Newline()
+	b.Insert("hi")
+
+	b.SetCursor(50, 50)
+	if b.Row() != 1 || b.Col() != 2 {
+		t.Errorf("cursor = %d,%d, want 1,2", b.Row(), b.Col())
+	}
+	b.SetCursor(-3, -3)
+	if b.Row() != 0 || b.Col() != 0 {
+		t.Errorf("cursor = %d,%d, want 0,0", b.Row(), b.Col())
+	}
+}
+
+func TestLoadNormalisesLineEndings(t *testing.T) {
+	b := New()
+	b.Load("a\r\nb\nc")
+
+	if got := b.String(); got != "a\nb\nc" {
+		t.Errorf("document = %q, want %q", got, "a\nb\nc")
+	}
+	if b.Rows() != 3 || b.Row() != 0 || b.Col() != 0 {
+		t.Errorf("rows=%d cursor=%d,%d, want 3 at 0,0", b.Rows(), b.Row(), b.Col())
+	}
+}

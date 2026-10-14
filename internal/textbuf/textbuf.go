@@ -132,3 +132,30 @@ func (b *Buffer) MoveHome() { b.col = 0 }
 
 // MoveEnd puts the cursor at the end of the line.
 func (b *Buffer) MoveEnd() { b.col = len([]rune(b.lines[b.row])) }
+
+// Delete removes the rune under the cursor, joining lines at the end of a line.
+func (b *Buffer) Delete() {
+	line := []rune(b.lines[b.row])
+	if b.col < len(line) {
+		b.lines[b.row] = string(line[:b.col]) + string(line[b.col+1:])
+		return
+	}
+	if b.row == len(b.lines)-1 {
+		return
+	}
+	b.lines[b.row] = string(line) + b.lines[b.row+1]
+	b.lines = append(b.lines[:b.row+1], b.lines[b.row+2:]...)
+}
+
+// SetCursor moves the cursor to an arbitrary position, clamped to the document.
+func (b *Buffer) SetCursor(row, col int) {
+	b.row = min(max(row, 0), len(b.lines)-1)
+	b.col = min(max(col, 0), len([]rune(b.lines[b.row])))
+}
+
+// Load replaces the document with text, normalising Windows line endings.
+func (b *Buffer) Load(text string) {
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	b.lines = strings.Split(text, "\n")
+	b.row, b.col = 0, 0
+}

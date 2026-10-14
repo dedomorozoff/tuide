@@ -39,7 +39,7 @@ func TestProgramRunsAndQuits(t *testing.T) {
 		done <- err
 	}()
 
-	program.Send(tea.KeyPressMsg(tea.Key{Code: 'q', Mod: tea.ModCtrl}))
+	program.Send(tea.KeyPressMsg(tea.Key{Code: 'q', Mod: tea.ModCtrl | tea.ModAlt}))
 
 	select {
 	case err := <-done:
@@ -48,7 +48,7 @@ func TestProgramRunsAndQuits(t *testing.T) {
 		}
 	case <-time.After(10 * time.Second):
 		program.Kill()
-		t.Fatal("program did not exit after ctrl+q")
+		t.Fatal("program did not exit after ctrl+alt+q")
 	}
 
 	if out.Len() == 0 {

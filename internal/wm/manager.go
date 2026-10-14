@@ -143,6 +143,9 @@ func (m *Manager) Windows() []*Window {
 	return windows
 }
 
+// All returns every window on every workspace, in stacking order.
+func (m *Manager) All() []*Window { return m.windows }
+
 // Find returns a window by id, wherever it lives, or nil.
 func (m *Manager) Find(id string) *Window {
 	for _, w := range m.windows {

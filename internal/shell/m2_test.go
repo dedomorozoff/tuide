@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/dedomorozoff/tuide/internal/appsdk"
+	"github.com/dedomorozoff/tuide/internal/config"
 	"github.com/dedomorozoff/tuide/internal/input"
 	"github.com/dedomorozoff/tuide/internal/theme"
 	"github.com/dedomorozoff/tuide/internal/wm"
@@ -326,5 +327,122 @@ func TestDefaultsIncludeLauncherKeys(t *testing.T) {
 	action, ok = keymap.Lookup(tea.KeyPressMsg(tea.Key{Code: 'a', Mod: tea.ModCtrl | tea.ModAlt}))
 	if !ok || action != input.ActionOpenPalette {
 		t.Errorf("ctrl+alt+a = %q, %v, want open-palette", action, ok)
+	}
+}
+
+type recordingConfigApp struct {
+	lastState config.Config
+	savedErr  error
+	received  bool
+}
+
+func (r *recordingConfigApp) Init() tea.Cmd { return nil }
+func (r *recordingConfigApp) Update(msg tea.Msg) (appsdk.App, tea.Cmd) {
+	switch m := msg.(type) {
+	case appsdk.ConfigState:
+		r.lastState = m.Config
+		r.received = true
+	case appsdk.ConfigSaved:
+		r.savedErr = m.Err
+		r.received = true
+	}
+	return r, nil
+}
+func (r *recordingConfigApp) View(appsdk.Context) tea.View { return tea.NewView("config app") }
+func (r *recordingConfigApp) Close() tea.Cmd               { return nil }
+
+func TestConfigRequestAndSave(t *testing.T) {
+	recApp := &recordingConfigApp{}
+	spec := appsdk.Spec{
+		ID:            "settings",
+		Name:          "Settings",
+		DefaultWidth:  30,
+		DefaultHeight: 15,
+		Launch:        func() appsdk.App { return recApp },
+	}
+
+	m := New(theme.Get("midnight"), []appsdk.Spec{spec}, Options{
+		Width:   80,
+		Height:  24,
+		Taskbar: true,
+		Mouse:   true,
+		Launch:  []string{"settings"},
+	})
+	_ = m.Init()
+
+	// 1. RequestConfig
+	_, cmd := m.Update(appsdk.RequestConfig{})
+	if cmd != nil {
+		_ = cmd()
+	}
+	if !recApp.received {
+		t.Fatal("expected recording app to receive ConfigState")
+	}
+	if recApp.lastState.Theme != "midnight" {
+		t.Errorf("expected theme midnight, got %q", recApp.lastState.Theme)
+	}
+
+	// 2. SaveConfig
+	newCfg := config.Config{
+		Theme:   "daylight",
+		Taskbar: false,
+		Mouse:   false,
+	}
+	_, cmd = m.Update(appsdk.SaveConfig{Config: newCfg})
+	if m.styles.Theme.Name != "daylight" {
+		t.Errorf("expected daylight theme applied immediately, got %q", m.styles.Theme.Name)
+	}
+	if m.options.Taskbar != false {
+		t.Errorf("expected taskbar disabled, got %v", m.options.Taskbar)
+	}
+	if cmd != nil {
+		savedMsg := cmd()
+		_, replyCmd := m.Update(savedMsg)
+		if replyCmd != nil {
+			_ = replyCmd()
+		}
+	}
+}
+
+func TestWindowTitleButtons(t *testing.T) {
+	m := newMultiDesktop("btnwin")
+	_ = m.Init()
+
+	w := m.windows.Find("btnwin")
+	if w == nil {
+		t.Fatal("window btnwin not found")
+	}
+
+	// Window starts normal.
+	// Click on minimize [_]:
+	// Title bar is at w.Rect.Y + 1. Controls start at w.Rect.Right() - 1 - 9.
+	ctlStart := w.Rect.Right() - 1 - 9
+	minX := ctlStart + 1
+	titleY := w.Rect.Y + 1
+
+	m.Update(tea.MouseClickMsg(tea.Mouse{X: minX, Y: titleY, Button: tea.MouseLeft}))
+	if w.State != wm.Minimized {
+		t.Errorf("expected minimized after [_] click, got %v", w.State)
+	}
+
+	// Restore via taskbar click:
+	m.Update(tea.MouseClickMsg(tea.Mouse{X: 10, Y: 23, Button: tea.MouseLeft}))
+	if w.State != wm.Normal {
+		t.Errorf("expected normal after restoring, got %v", w.State)
+	}
+
+	// Click on maximize [^]:
+	maxX := ctlStart + 4
+	m.Update(tea.MouseClickMsg(tea.Mouse{X: maxX, Y: titleY, Button: tea.MouseLeft}))
+	if w.State != wm.Maximized {
+		t.Errorf("expected maximized after [^] click, got %v", w.State)
+	}
+
+	// Click on close [x]:
+	closeX := w.Rect.Right() - 1 - 9 + 7
+	closeY := w.Rect.Y + 1
+	m.Update(tea.MouseClickMsg(tea.Mouse{X: closeX, Y: closeY, Button: tea.MouseLeft}))
+	if m.windows.Find("btnwin") != nil {
+		t.Error("expected window closed after [x] click")
 	}
 }

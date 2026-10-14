@@ -113,13 +113,22 @@ func stateName(state wm.State) string {
 	return "normal"
 }
 
+// truncate cuts a string down to at most limit display cells, marking that
+// something was left off with an ellipsis.
 func truncate(s string, limit int) string {
-	runes := []rune(s)
-	if len(runes) <= limit {
+	if limit <= 0 {
+		return ""
+	}
+	if lipgloss.Width(s) <= limit {
 		return s
 	}
-	if limit <= 1 {
-		return string(runes[:limit])
+	if limit == 1 {
+		return "…"
 	}
-	return string(runes[:limit-1]) + "…"
+
+	runes := []rune(s)
+	for len(runes) > 0 && lipgloss.Width(string(runes))+1 > limit {
+		runes = runes[:len(runes)-1]
+	}
+	return string(runes) + "…"
 }

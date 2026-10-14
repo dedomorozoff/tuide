@@ -7,17 +7,19 @@ import (
 // Defaults are the bindings the desktop starts with. They are deliberately
 // conservative: the focused app gets every key that is not claimed here.
 //
-// The desktop modifier is Ctrl+Alt. Window move and resize live on the arrow
-// keys; snapping, layouts and workspaces live on the letter and number rows.
+// The desktop modifier is Ctrl+Alt. Nothing is bound to a bare Ctrl chord,
+// because those belong to the program inside the window: ctrl+c interrupts,
+// ctrl+w deletes a word and ctrl+q is XON. Alt+Tab is the one exception, and
+// no terminal program binds it.
 func Defaults() []Mapping {
 	mappings := []Mapping{
-		{Action: ActionQuit, Mods: tea.ModCtrl, Key: 'q'},
+		{Action: ActionQuit, Mods: tea.ModCtrl | tea.ModAlt, Key: 'q'},
 
 		{Action: ActionFocusNext, Mods: tea.ModAlt, Key: tea.KeyTab},
 		{Action: ActionFocusPrev, Mods: tea.ModAlt | tea.ModShift, Key: tea.KeyTab},
 		{Action: ActionFocusLast, Mods: tea.ModCtrl | tea.ModAlt, Key: 'p'},
 
-		{Action: ActionClose, Mods: tea.ModCtrl, Key: 'w'},
+		{Action: ActionClose, Mods: tea.ModCtrl | tea.ModAlt, Key: 'w'},
 		{Action: ActionMaximize, Mods: tea.ModCtrl | tea.ModAlt, Key: 'm'},
 		{Action: ActionMinimize, Mods: tea.ModCtrl | tea.ModAlt, Key: 'n'},
 

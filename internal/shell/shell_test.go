@@ -102,12 +102,12 @@ func TestQuitIsBound(t *testing.T) {
 	m := newTestDesktop()
 	_ = m.Init()
 
-	model, cmd := m.Update(tea.KeyPressMsg(tea.Key{Code: 'q', Mod: tea.ModCtrl}))
+	model, cmd := m.Update(tea.KeyPressMsg(tea.Key{Code: 'q', Mod: tea.ModCtrl | tea.ModAlt}))
 	if model == nil {
 		t.Fatal("Update returned a nil model")
 	}
 	if cmd == nil {
-		t.Error("ctrl+q should produce a command")
+		t.Error("ctrl+alt+q should produce a command")
 	}
 }
 

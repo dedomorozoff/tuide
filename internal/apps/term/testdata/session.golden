@@ -1,0 +1,12 @@
+user@host ~/src/tuide$ ls internal
+
+apps  compositor  shell  vt
+wm
+
+user@host ~/src/tuide$ git status
+On branch main
+nothing to commit, working tree clean
+
+user@host ~/src/tuide$  less README.md
+
+

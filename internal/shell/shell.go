@@ -12,6 +12,7 @@ import (
 	"github.com/dedomorozoff/tuide/internal/config"
 	"github.com/dedomorozoff/tuide/internal/geom"
 	"github.com/dedomorozoff/tuide/internal/input"
+	"github.com/dedomorozoff/tuide/internal/sys"
 	"github.com/dedomorozoff/tuide/internal/theme"
 	"github.com/dedomorozoff/tuide/internal/wm"
 )
@@ -64,6 +65,19 @@ type Model struct {
 	launcher launcherState
 	// now is the time the last tick reported; the taskbar clock reads it.
 	now time.Time
+	// frameSizes remembers the content size each app was last told about, so
+	// only real resizes produce a message.
+	frameSizes map[string][2]int
+	// netOnline is the cached internet connectivity status.
+	netOnline bool
+	// netTick counts ticks to throttle connectivity probes.
+	netTick int
+	// batteryPercent is the last known charge percentage.
+	batteryPercent int
+	// batteryCharging reports if connected to AC power.
+	batteryCharging bool
+	// batteryKnown reports if a system battery is present.
+	batteryKnown bool
 }
 
 // New builds the desktop from a palette, a set of launchable apps and options.
@@ -78,9 +92,15 @@ func New(palette theme.Theme, specs []appsdk.Spec, options Options) *Model {
 		specs:    make(map[string]appsdk.Spec, len(specs)),
 		snapLast: make(map[string]wm.Zone),
 		options:  options,
-		width:    width,
-		height:   height,
-		now:      time.Now(),
+		cfg: config.Config{
+			Theme:   palette.Name,
+			Startup: options.Launch,
+			Taskbar: options.Taskbar,
+			Mouse:   options.Mouse,
+		},
+		width:  width,
+		height: height,
+		now:    time.Now(),
 	}
 	for _, spec := range specs {
 		if spec.ID == "" {
@@ -116,34 +136,117 @@ func (m *Model) Init() tea.Cmd {
 			cmds = append(cmds, cmd)
 		}
 	}
-	cmds = append(cmds, tickCmd())
+	cmds = append(cmds, tickCmd(), probeNetCmd, probeBatteryCmd)
 	return tea.Batch(cmds...)
 }
 
 // Update handles a message and returns the next model.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	model, cmd := m.update(msg)
+	if m.shutdown {
+		return model, cmd
+	}
+	return model, tea.Batch(cmd, m.syncFrames())
+}
+
+// update is the message dispatch itself. Update wraps it so the frame sizes
+// stay in step with the geometry no matter which message changed it.
+func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m, m.resize(msg.Width, msg.Height)
 
 	case tickMsg:
 		m.now = time.Time(msg)
-		return m, tea.Batch(tickCmd(), m.windows.Broadcast(appsdk.Tick{Time: m.now}))
+		m.netTick++
+		cmds := []tea.Cmd{tickCmd(), m.windows.Broadcast(appsdk.Tick{Time: m.now})}
+		if m.netTick%30 == 0 {
+			cmds = append(cmds, probeNetCmd)
+		}
+		if m.netTick%5 == 0 {
+			cmds = append(cmds, probeBatteryCmd)
+		}
+		return m, tea.Batch(cmds...)
+
+	case netMsg:
+		m.netOnline = bool(msg)
+		return m, nil
+
+	case batteryMsg:
+		m.batteryPercent = msg.percent
+		m.batteryCharging = msg.charging
+		m.batteryKnown = msg.available
+		return m, nil
+
+	case appsdk.RequestConfig:
+		return m, m.replyToFocused(appsdk.ConfigState{Config: m.cfg})
+
+	case appsdk.SaveConfig:
+		m.applyConfig(msg.Config)
+		cfgToSave := msg.Config
+		saveCmd := func() tea.Msg {
+			return configSavedMsg{err: cfgToSave.Save()}
+		}
+		return m, saveCmd
+
+	case configSavedMsg:
+		if msg.err != nil {
+			m.lastErr = msg.err
+		}
+		return m, m.replyToFocused(appsdk.ConfigSaved{Err: msg.err})
 
 	case tea.KeyPressMsg:
 		return m, m.onKeyPress(msg)
 
 	case tea.MouseClickMsg:
-		return m, m.onClick(msg.Mouse())
+		return m, m.onClick(msg)
 
 	case tea.MouseMotionMsg:
-		return m, m.onMotion(msg.Mouse())
+		return m, m.onMotion(msg)
 
 	case tea.MouseReleaseMsg:
-		return m, m.onRelease(msg.Mouse())
+		return m, m.onRelease(msg)
 	}
 
 	return m, m.windows.Update(msg)
+}
+
+// syncFrames tells an app when the rectangle it may draw into changed size.
+// Geometry can move on any message at all, so this runs after every dispatch.
+func (m *Model) syncFrames() tea.Cmd {
+	if m.frameSizes == nil {
+		m.frameSizes = make(map[string][2]int)
+	}
+
+	live := make(map[string]bool, len(m.windows.All()))
+	cmds := make([]tea.Cmd, 0, len(live))
+
+	for _, w := range m.windows.All() {
+		live[w.ID] = true
+
+		rect := w.ContentRect()
+		size := [2]int{rect.Width, rect.Height}
+		if previous, ok := m.frameSizes[w.ID]; ok && previous == size {
+			continue
+		}
+		m.frameSizes[w.ID] = size
+
+		if w.App == nil {
+			continue
+		}
+		app, cmd := w.App.Update(appsdk.Frame{Width: size[0], Height: size[1]})
+		w.App = app
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+
+	for id := range m.frameSizes {
+		if !live[id] {
+			delete(m.frameSizes, id)
+		}
+	}
+	return tea.Batch(cmds...)
 }
 
 // View composites the whole desktop into a single frame.
@@ -188,9 +291,28 @@ func (m *Model) Err() error { return m.lastErr }
 // tickMsg carries the wall clock into the model once a second.
 type tickMsg time.Time
 
+// netMsg carries connectivity status.
+type netMsg bool
+
+// batteryMsg carries battery status.
+type batteryMsg struct {
+	percent   int
+	charging  bool
+	available bool
+}
+
 // tickCmd schedules the next clock tick.
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(now time.Time) tea.Msg { return tickMsg(now) })
+}
+
+func probeNetCmd() tea.Msg {
+	return netMsg(sys.Online())
+}
+
+func probeBatteryCmd() tea.Msg {
+	pct, chg, avail := sys.Battery()
+	return batteryMsg{percent: pct, charging: chg, available: avail}
 }
 
 // resize applies a new terminal size.
