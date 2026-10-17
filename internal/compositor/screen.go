@@ -76,11 +76,12 @@ func (s *Screen) Set(x, y int, cell Cell) {
 	s.cells[y*s.width+x] = cell
 }
 
-// Fill paints every cell of the rectangle with a blank cell of that style,
-// clipping to the screen. Used for window bodies and panel backgrounds.
-func (s *Screen) Fill(rect geom.Rect, style string) {
+// Fill paints every cell of the rectangle with a blank cell carrying the given
+// background, clipping to the screen. Used for window bodies and panel
+// backgrounds.
+func (s *Screen) Fill(rect geom.Rect, background string) {
 	area := rect.Intersect(s.Bounds())
-	cell := Cell{Style: style, Text: " ", Width: 1}
+	cell := Cell{Background: background, Text: " ", Width: 1}
 	for y := area.Y; y < area.Bottom(); y++ {
 		for x := area.X; x < area.Right(); x++ {
 			s.cells[y*s.width+x] = cell
@@ -108,7 +109,7 @@ func (s *Screen) Blit(rect geom.Rect, content string) {
 				break
 			}
 			if x >= area.X {
-				s.write(x, y, cell)
+				s.blit(x, y, cell)
 			}
 			x += cell.Width
 		}
@@ -145,12 +146,25 @@ func (s *Screen) BlitCells(rect geom.Rect, cells []Cell) {
 	}
 }
 
+// blit paints one string cell without letting it drop the background beneath.
+// A cell that names no background of its own — an app that styles only a
+// foreground, or the padding lipgloss leaves unstyled — keeps the background
+// already at that cell, so text lands on the window body instead of the host
+// terminal's default colour. The caller guarantees the coordinates are on
+// screen.
+func (s *Screen) blit(x, y int, cell Cell) {
+	if cell.Background == "" {
+		cell.Background = s.cells[y*s.width+x].Background
+	}
+	s.write(x, y, cell)
+}
+
 // write paints a grapheme and reserves the remaining cells of wide characters.
-// A blit replaces the cell outright, style included: text painted over a
-// coloured cell takes the colour of what painted it, not the colour it covered.
+// A prepared cell replaces the one it covers outright, background included:
+// the terminal hands over whole rows and already decided every colour.
 func (s *Screen) write(x, y int, cell Cell) {
 	s.Set(x, y, cell)
-	continuation := Cell{Style: cell.Style, Text: "", Width: 0}
+	continuation := Cell{Style: cell.Style, Background: cell.Background, Text: "", Width: 0}
 	for offset := 1; offset < cell.Width; offset++ {
 		s.Set(x+offset, y, continuation)
 	}

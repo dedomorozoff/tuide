@@ -78,8 +78,42 @@ func TestScreenFillAppliesStyle(t *testing.T) {
 	s := New(2, 1)
 	s.Fill(geom.Rect{Width: 2, Height: 1}, "\x1b[41m")
 
-	if got := s.At(0, 0).Style; got != "\x1b[41m" {
-		t.Errorf("cell style = %q, want background style", got)
+	if got := s.At(0, 0).Background; got != "\x1b[41m" {
+		t.Errorf("cell background = %q, want the fill background", got)
+	}
+}
+
+func TestScreenBlitKeepsTheBackgroundUnderTheText(t *testing.T) {
+	s := New(6, 1)
+	s.Fill(geom.Rect{Width: 6, Height: 1}, "\x1b[44m")
+	s.Blit(geom.Rect{Width: 3, Height: 1}, "abc")
+
+	for x := range 6 {
+		if got := s.At(x, 0).Background; got != "\x1b[44m" {
+			t.Fatalf("cell %d background = %q, want the fill background", x, got)
+		}
+	}
+}
+
+func TestScreenBlitKeepsTheBackgroundOfStyledPadding(t *testing.T) {
+	s := New(6, 1)
+	s.Fill(geom.Rect{Width: 6, Height: 1}, "\x1b[44m")
+	s.Blit(geom.Rect{Width: 6, Height: 1}, "\x1b[31ma\x1b[0m  ")
+
+	if got := s.At(1, 0).Background; got != "\x1b[44m" {
+		t.Errorf("padding after a reset kept background %q, want the fill background", got)
+	}
+}
+
+func TestScreenBlitLetsACellNameItsOwnBackground(t *testing.T) {
+	s := New(3, 1)
+	s.Fill(geom.Rect{Width: 3, Height: 1}, "\x1b[44m")
+	s.Blit(geom.Rect{Width: 3, Height: 1}, "\x1b[41mabc")
+
+	for x := range 3 {
+		if got := s.At(x, 0).Background; got != "\x1b[41m" {
+			t.Fatalf("cell %d background = %q, want the blitted one", x, got)
+		}
 	}
 }
 

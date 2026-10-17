@@ -11,13 +11,19 @@ import (
 
 const resetStyle = "\x1b[0m"
 
-// Cell is one terminal cell: a grapheme plus the SGR prefix that was active
-// when it was written. Keeping the prefix per cell means overwriting a cell
-// cannot leak color into its neighbours.
+// Cell is one terminal cell: a grapheme plus the SGR prefixes that were active
+// when it was written. Keeping them per cell means overwriting a cell cannot
+// leak color into its neighbours.
+//
+// The background is kept apart from the rest of the style. Text that sets only
+// a foreground, or none at all, must not punch the terminal's default
+// background through whatever is under it, so a blit lets such a cell inherit
+// the background it covers; a cell that names its own keeps it.
 type Cell struct {
-	Style string
-	Text  string
-	Width int
+	Style      string
+	Background string
+	Text       string
+	Width      int
 }
 
 // Blank returns a cell showing a space in the default style.
@@ -57,7 +63,12 @@ func splitCells(s string) []Cell {
 		if width < 1 {
 			width = 1
 		}
-		cells = append(cells, Cell{Style: active.String(), Text: seq, Width: width})
+		cells = append(cells, Cell{
+			Style:      active.String(),
+			Background: active.background(),
+			Text:       seq,
+			Width:      width,
+		})
 	}
 
 	return cells
@@ -99,19 +110,20 @@ func cellRows(s string, maxRows int) [][]Cell {
 // at the end so nothing bleeds into the next row.
 func joinRow(cells []Cell) string {
 	var b strings.Builder
-	style := ""
+	style, background := "", ""
 	for _, cell := range cells {
-		if cell.Style != style {
-			if cell.Style == "" {
+		if cell.Style != style || cell.Background != background {
+			if cell.Style == "" && cell.Background == "" {
 				b.WriteString(resetStyle)
 			} else {
 				b.WriteString(cell.Style)
+				b.WriteString(cell.Background)
 			}
-			style = cell.Style
+			style, background = cell.Style, cell.Background
 		}
 		b.WriteString(cell.Text)
 	}
-	if style != "" {
+	if style != "" || background != "" {
 		b.WriteString(resetStyle)
 	}
 	return b.String()
@@ -146,9 +158,22 @@ func (s *sgrState) String() string {
 	}
 	var b strings.Builder
 	for _, key := range slices.Sorted(maps.Keys(s.active)) {
+		if key == keyBg {
+			continue
+		}
 		b.WriteString(s.active[key])
 	}
 	return b.String()
+}
+
+// background is the SGR sequence that sets the current background, or empty
+// when the style names none. It is rendered on its own so a cell can keep the
+// background it draws over.
+func (s *sgrState) background() string {
+	if s.active == nil {
+		return ""
+	}
+	return s.active[keyBg]
 }
 
 const (
