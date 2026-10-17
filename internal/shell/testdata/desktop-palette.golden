@@ -1,18 +1,18 @@
-            ╭──────────────────────────────────╮
-            │ actions                          │
-       ╭────│                                  │────╮
-       │● We│ ❯                                │][x]│
-       │tuiD│                                  │    │
-       │44x9│ › Close window                   │    │
-       │    │   Maximize window                │    │
-       │ctrl│   Minimize window                │ions│
-       │    │   Snap left                      │    │
-       │    │   Snap right                     │    │
-       │    │   Snap top                       │    │
-       │    │   Snap bottom                    │    │
-       │    │   Snap center                    │    │
-       ╰────│   Toggle layout                  │────╯
-            │                                  │
-            │ enter run · esc cancel · ↑↓ move │
-            ╰──────────────────────────────────╯
- ≡ start  Welcome                                     21:45
+         ╭───────────────────────────────────────╮
+         │ actions                               │
+       ╭─│                                       │──╮
+       │*│ >                                     │x]│
+       │t│                                       │  │
+       │4│ > Close window                        │  │
+       │ │   Maximize window                     │  │
+       │c│   Minimize window                     │ns│
+       │ │   Snap left                           │  │
+       │ │   Snap right                          │  │
+       │ │   Snap top                            │  │
+       │ │   Snap bottom                         │  │
+       │ │   Snap center                         │  │
+       ╰─│   Toggle layout                       │──╯
+         │                                       │
+         │ enter run | esc cancel | up/down move │
+         ╰───────────────────────────────────────╯
+ start  Welcome                                       21:45

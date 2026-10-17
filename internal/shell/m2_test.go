@@ -258,6 +258,25 @@ func TestTaskbarStartButtonOpensLauncher(t *testing.T) {
 	}
 }
 
+// TestLauncherOpensAboveTheStartButton pins the start menu to the corner the
+// button opened it from: left edge, bottom row just above the taskbar.
+func TestLauncherOpensAboveTheStartButton(t *testing.T) {
+	m := launcherDesktop()
+	_ = m.Init()
+	m.openLauncher(launcherApps)
+
+	layout := m.launcherLayout()
+	bottom := m.windows.WorkArea().Bottom()
+
+	if layout.rect.X != 0 {
+		t.Errorf("launcher X = %d, want the left edge", layout.rect.X)
+	}
+	if layout.rect.Bottom() != bottom {
+		t.Errorf("launcher bottom = %d, want just above the taskbar at %d",
+			layout.rect.Bottom(), bottom)
+	}
+}
+
 func TestTaskbarButtonClickFocusesAndMinimizes(t *testing.T) {
 	m := newMultiDesktop("a", "b")
 	_ = m.Init()

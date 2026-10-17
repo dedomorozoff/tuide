@@ -151,6 +151,6 @@ func (a *App) renderLine(line string, cursor bool) string {
 }
 
 func (a *App) status() string {
-	return fmt.Sprintf("Ln %d, Col %d  ·  %d lines",
+	return fmt.Sprintf("Ln %d, Col %d | %d lines",
 		a.buffer.Row()+1, a.buffer.Col()+1, a.buffer.Rows())
 }

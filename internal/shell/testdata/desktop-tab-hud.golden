@@ -1,12 +1,12 @@
 
 
        ╭────────────────────────────────────────────╮
-       │● Welcome                          [_][^][x]│
+       │* Welcome                          [_][^][x]│
        │tuiDE midnight                              │
        │44x9 cells, focused=true                    │
        │                                            │
        │ctrl+alt+space╭──────────────╮+alt+a actions│
-       │              │ › 1  Welcome │              │
+       │              │ > 1  Welcome │              │
        │              ╰──────────────╯              │
        │                                            │
        │                                            │
@@ -15,4 +15,4 @@
 
 
 
- ≡ start  Welcome                                     21:45
+ start  Welcome                                       21:45

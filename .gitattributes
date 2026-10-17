@@ -1,0 +1,4 @@
+# Go sources and golden files compare byte for byte in tests and gofmt,
+# so they stay in LF whatever the checkout settings are.
+*.go text eol=lf
+*.golden text eol=lf

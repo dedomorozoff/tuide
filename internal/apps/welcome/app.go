@@ -40,7 +40,7 @@ func (a App) View(ctx appsdk.Context) tea.View {
 		fmt.Sprintf("%dx%d cells, focused=%v", ctx.Rect.Width, ctx.Rect.Height, ctx.Focused))
 	// Quitting lives in the action palette, so the window points at the two
 	// shortcuts that actually get the desktop moving instead.
-	hint := lipgloss.NewStyle().Foreground(a.Theme.Text).Render("ctrl+alt+space launcher · ctrl+alt+a actions")
+	hint := lipgloss.NewStyle().Foreground(a.Theme.Text).Render("ctrl+alt+space launcher | ctrl+alt+a actions")
 
 	return tea.NewView(lipgloss.JoinVertical(
 		lipgloss.Left,

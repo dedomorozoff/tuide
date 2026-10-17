@@ -1,7 +1,7 @@
 
 
        ╭────────────────────────────────────────────╮
-       │● Welcome                          [_][^][x]│
+       │* Welcome                          [_][^][x]│
        │╭─────────────────────────────────────────╮ │
        ││ tuiDE inspector                         │ │
        ││ workspace  1/9                          │ │
@@ -10,9 +10,9 @@
        ││ focus      Welcome                      │ │
        ││                                         │ │
        ││ z   window        rect           state  │ │
-       ││ ●1  Welcome        7,2    46x12  normal │ │
+       ││ *1  Welcome        7,2    46x12  normal │ │
        ╰╰─────────────────────────────────────────╯─╯
 
 
 
- ≡ start  Welcome                                     21:45
+ start  Welcome                                       21:45

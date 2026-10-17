@@ -1,18 +1,18 @@
 
 
        ╭────────────────────────────────────────────╮
-       │● Welcome                          [_][^][x]│
-       │tuiD╭──────────────────────────────────╮    │
-       │44x9│ launcher                         │    │
-       │    │                                  │    │
-       │ctrl│ ❯                                │ions│
-       │    │                                  │    │
-       │    │ › Welcome                        │    │
-       │    │                                  │    │
-       │    │ enter run · esc cancel · ↑↓ move │    │
-       │    ╰──────────────────────────────────╯    │
-       ╰────────────────────────────────────────────╯
-
-
-
- ≡ start  Welcome                                     21:45
+       │* Welcome                          [_][^][x]│
+       │tuiDE midnight                              │
+       │44x9 cells, focused=true                    │
+       │                                            │
+       │ctrl+alt+space launcher | ctrl+alt+a actions│
+╭───────────────────────────────────────╮           │
+│ launcher                              │           │
+│                                       │           │
+│ >                                     │           │
+│                                       │           │
+│ > Welcome                             │───────────╯
+│                                       │
+│ enter run | esc cancel | up/down move │
+╰───────────────────────────────────────╯
+ start  Welcome                                       21:45

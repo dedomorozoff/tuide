@@ -12,8 +12,10 @@ import (
 	"github.com/dedomorozoff/tuide/internal/wm"
 )
 
-// startLabel is the taskbar's menu button; clicking it opens the launcher.
-const startLabel = "≡ start"
+// startLabel is the taskbar's menu button; clicking it opens the launcher. The
+// label is plain text on purpose: box-drawing and letters have one width on
+// every terminal, while icon-like glyphs may be counted as two cells.
+const startLabel = "start"
 
 func (m *Model) drawWindow(w *wm.Window, focused bool) {
 	m.screen.Fill(w.Rect, theme.Background(m.styles.Theme.Background))
@@ -168,9 +170,9 @@ func titledWindowLabel(w *wm.Window, focused bool, name string) string {
 	if name == "" {
 		name = w.Spec.Name
 	}
-	mark := "○"
+	mark := "o"
 	if focused {
-		mark = "●"
+		mark = "*"
 	}
 	left := mark + " "
 	controls := "[_][^][x]"

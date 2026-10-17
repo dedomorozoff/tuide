@@ -270,7 +270,7 @@ func TestRuntimeTitleIsCutToTheSpaceLeft(t *testing.T) {
 	if !strings.HasSuffix(got, "[_][^][x]") {
 		t.Fatalf("label = %q, want the window controls to survive", got)
 	}
-	if !strings.Contains(got, "…") {
+	if !strings.Contains(got, "...") {
 		t.Fatalf("label = %q, want an ellipsis where the name was cut", got)
 	}
 }

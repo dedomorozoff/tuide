@@ -231,6 +231,24 @@ type launcherLayout struct {
 // blank.
 const launcherFirstRow = 4
 
+// launcherRect anchors the overlay in the bottom-left corner, above the taskbar
+// and the start button that opened it, the way a start menu opens. Without a
+// taskbar it sits in the corner of the work area all the same.
+func (m *Model) launcherRect(content string) geom.Rect {
+	box := m.panelStyle().Render(content)
+
+	bottom := m.windows.WorkArea().Bottom()
+	height := min(lipgloss.Height(box), max(0, bottom))
+	width := min(lipgloss.Width(box), m.width)
+
+	return geom.Rect{
+		X:      0,
+		Y:      max(0, bottom-height),
+		Width:  width,
+		Height: height,
+	}
+}
+
 // launcherLayout builds the overlay: the filtered rows, the string to render
 // and the cells those rows occupy.
 func (m *Model) launcherLayout() launcherLayout {
@@ -269,16 +287,20 @@ func (m *Model) launcherLayout() launcherLayout {
 				selected: i == selected,
 			})
 			if i == selected {
-				lines = append(lines, m.styles.Selection.Render("› "+label))
+				lines = append(lines, m.styles.Selection.Render("> "+label))
 				continue
 			}
 			lines = append(lines, "  "+label)
 		}
 	}
 
-	lines = append(lines, "", m.styles.Hint.Render("enter run · esc cancel · ↑↓ move"))
+	lines = append(lines, "", m.styles.Hint.Render("enter run | esc cancel | up/down move"))
 	layout.content = strings.Join(lines, "\n")
-	layout.rect = m.panelRect(layout.content)
+	if m.launcher.mode == launcherApps {
+		layout.rect = m.launcherRect(layout.content)
+	} else {
+		layout.rect = m.panelRect(layout.content)
+	}
 
 	for i := range layout.rows {
 		layout.rows[i].rect = geom.Rect{
@@ -300,7 +322,7 @@ func (m *Model) drawLauncher() {
 
 // launcherPrompt is the query line with a block cursor behind it.
 func (m *Model) launcherPrompt() string {
-	prompt := lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Render("❯ ")
+	prompt := lipgloss.NewStyle().Foreground(m.styles.Theme.Accent).Render("> ")
 	query := lipgloss.NewStyle().Foreground(m.styles.Theme.Text).Render(string(m.launcher.query))
 	cursor := lipgloss.NewStyle().
 		Foreground(m.styles.Theme.Background).

@@ -99,7 +99,7 @@ func (a *App) View(ctx appsdk.Context) tea.View {
 	}
 
 	text := lipgloss.NewStyle().Foreground(a.theme.Text)
-	prompt := lipgloss.NewStyle().Foreground(a.theme.Accent).Render("❯ ")
+	prompt := lipgloss.NewStyle().Foreground(a.theme.Accent).Render("> ")
 	cursor := lipgloss.NewStyle().
 		Foreground(a.theme.Background).
 		Background(a.theme.Cursor).
@@ -121,7 +121,7 @@ func (a *App) View(ctx appsdk.Context) tea.View {
 
 	if ctx.Rect.Height >= 5 {
 		hint := lipgloss.NewStyle().Foreground(a.theme.TextDim).
-			Render("+ - * / ( )  ·  enter = result  ·  esc = clear")
+			Render("+ - * / ( )  |  enter = result  |  esc = clear")
 		lines = append(lines, "", hint)
 	}
 

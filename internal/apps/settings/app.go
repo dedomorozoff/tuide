@@ -168,9 +168,9 @@ func (a *App) View(ctx appsdk.Context) tea.View {
 
 	lines = append(lines, "")
 	if a.status != "" {
-		lines = append(lines, dim.Render("• "+a.status))
+		lines = append(lines, dim.Render("* "+a.status))
 	} else {
-		lines = append(lines, dim.Render("↑/↓ select • space/enter toggle"))
+		lines = append(lines, dim.Render("up/down select | space/enter toggle"))
 	}
 
 	return tea.NewView(lipgloss.JoinVertical(lipgloss.Left, lines...))

@@ -27,7 +27,7 @@ func (m *Model) drawTabHUD() {
 		mark := "  "
 		style := m.styles.Panel
 		if w == focused {
-			mark = "› "
+			mark = "> "
 			style = m.styles.Selection
 		}
 		lines = append(lines, style.Render(fmt.Sprintf("%s%d  %s", mark, index, w.Spec.Name)))
@@ -61,7 +61,7 @@ func (m *Model) drawInspector() {
 	for i, w := range m.windows.Windows() {
 		mark := " "
 		if w == focused {
-			mark = "●"
+			mark = "*"
 		}
 		lines = append(lines, fmt.Sprintf("%s%-2d %-12s %3d,%-3d %3dx%-3d %s",
 			mark,
@@ -125,6 +125,8 @@ func stateName(state wm.State) string {
 
 // truncate cuts a string down to at most limit display cells, marking that
 // something was left off with an ellipsis.
+const ellipsis = "..."
+
 func truncate(s string, limit int) string {
 	if limit <= 0 {
 		return ""
@@ -132,13 +134,13 @@ func truncate(s string, limit int) string {
 	if lipgloss.Width(s) <= limit {
 		return s
 	}
-	if limit == 1 {
-		return "…"
+	if limit < len(ellipsis) {
+		return ellipsis[:limit]
 	}
 
 	runes := []rune(s)
-	for len(runes) > 0 && lipgloss.Width(string(runes))+1 > limit {
+	for len(runes) > 0 && lipgloss.Width(string(runes))+len(ellipsis) > limit {
 		runes = runes[:len(runes)-1]
 	}
-	return string(runes) + "…"
+	return string(runes) + ellipsis
 }

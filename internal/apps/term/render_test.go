@@ -82,12 +82,15 @@ func assertGolden(t *testing.T, name, got string) {
 		return
 	}
 
-	want, err := os.ReadFile(path)
+	golden, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read golden %s: %v (rerun with UPDATE_GOLDEN=1)", path, err)
 	}
-	if got+"\n" != string(want) {
-		t.Errorf("frame mismatch\n--- got ---\n%s\n--- want ---\n%s", got, string(want))
+	// Git may check the files out with CRLF endings, so the comparison runs on
+	// line endings the working tree agreed to.
+	want := strings.ReplaceAll(string(golden), "\r\n", "\n")
+	if got+"\n" != want {
+		t.Errorf("frame mismatch\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}
 }
 
