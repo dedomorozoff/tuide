@@ -21,7 +21,9 @@ func (m *Model) drawWindow(w *wm.Window, focused bool) {
 	m.screen.Fill(w.Rect, theme.Background(m.styles.Theme.Background))
 
 	frame, title := m.styles.WindowChrome(focused, w.Rect.Width, w.Rect.Height)
-	m.screen.Blit(w.Rect, frame.Render(title.Render(windowLabel(w, focused))))
+	frameStyle := frame
+	m.screen.Blit(w.Rect, frameStyle.Render(""))
+	m.screen.Blit(w.TitleRect(), title.Render(m.windowLabel(w, focused)))
 
 	if w.App == nil {
 		return
@@ -159,14 +161,14 @@ func (m *Model) startRect() geom.Rect {
 
 // windowLabel is the title bar text: the focus mark, the name and the window
 // controls. An app may rename its window, in which case its name is used.
-func windowLabel(w *wm.Window, focused bool) string {
-	return titledWindowLabel(w, focused, windowTitle(w))
+func (m *Model) windowLabel(w *wm.Window, focused bool) string {
+	return m.titledWindowLabel(w, focused, windowTitle(w))
 }
 
 // titledWindowLabel lays the title bar out around an arbitrary name. The name
 // gets whatever room the controls leave, so a long one is cut rather than
 // pushed under the buttons.
-func titledWindowLabel(w *wm.Window, focused bool, name string) string {
+func (m *Model) titledWindowLabel(w *wm.Window, focused bool, name string) string {
 	if name == "" {
 		name = w.Spec.Name
 	}
@@ -175,7 +177,7 @@ func titledWindowLabel(w *wm.Window, focused bool, name string) string {
 		mark = "*"
 	}
 	left := mark + " "
-	controls := "[_][^][x]"
+	controls := m.windowControls()
 	innerWidth := max(0, w.Rect.Width-2)
 	leftWidth := lipgloss.Width(left)
 	ctlWidth := lipgloss.Width(controls)
@@ -186,4 +188,16 @@ func titledWindowLabel(w *wm.Window, focused bool, name string) string {
 	}
 	name = truncate(name, room)
 	return left + name + strings.Repeat(" ", room-lipgloss.Width(name)) + controls
+}
+
+// windowControls is the title bar's three buttons, one cell group each and
+// painted in their own colors so they read as buttons even without a cursor.
+// A reset leads the strip: lipgloss closes every styled segment with one, so
+// without it the first button would keep the title bar's own background while
+// the two behind it would not.
+func (m *Model) windowControls() string {
+	const reset = "\x1b[m"
+	return reset + m.styles.Hint.Render("[_]") +
+		m.styles.Warning.Render("[■]") +
+		m.styles.Danger.Render("[x]")
 }

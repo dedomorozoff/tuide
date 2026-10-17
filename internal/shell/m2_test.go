@@ -190,6 +190,28 @@ func TestLauncherDoesNotLeakKeysToWindows(t *testing.T) {
 	}
 }
 
+// TestLauncherRowsMatchTheRenderedOverlay pins the click targets to what is on
+// screen. The row rectangles were laid out as if the panel padded vertically as
+// well as horizontally, so every target sat one line below the label it belonged
+// to: a click ran the row under the pointer or missed the list entirely.
+func TestLauncherRowsMatchTheRenderedOverlay(t *testing.T) {
+	m := launcherDesktop()
+	_ = m.Init()
+	m.openLauncher(launcherApps)
+
+	layout := m.launcherLayout()
+	lines := strings.Split(ansi.Strip(m.View().Content), "\n")
+
+	for _, row := range layout.rows {
+		if row.rect.Y < 0 || row.rect.Y >= len(lines) {
+			t.Fatalf("row %q targets y=%d, outside a %d line frame", row.label, row.rect.Y, len(lines))
+		}
+		if line := lines[row.rect.Y]; !strings.Contains(line, row.label) {
+			t.Errorf("row %q targets line %d, which shows %q", row.label, row.rect.Y, line)
+		}
+	}
+}
+
 func TestLauncherClickRunsTheRowUnderThePointer(t *testing.T) {
 	m := launcherDesktop()
 
@@ -371,11 +393,11 @@ func TestWindowControlsAreVisibleOnTheTitleRow(t *testing.T) {
 	}
 
 	lines := strings.Split(ansi.Strip(m.View().Content), "\n")
-	titleRow := w.Rect.Y + 1
+	titleRow := w.TitleRect().Y
 	if titleRow >= len(lines) {
 		t.Fatalf("title row %d is outside a %d line frame", titleRow, len(lines))
 	}
-	if !strings.Contains(lines[titleRow], "[_][^][x]") {
+	if !strings.Contains(lines[titleRow], "[_]") || !strings.Contains(lines[titleRow], "[■]") || !strings.Contains(lines[titleRow], "[x]") {
 		t.Errorf("the title row does not show the window controls: %q", lines[titleRow])
 	}
 }
@@ -602,10 +624,11 @@ func TestWindowTitleButtons(t *testing.T) {
 
 	// Window starts normal.
 	// Click on minimize [_]:
-	// Title bar is at w.Rect.Y + 1. Controls start at w.Rect.Right() - 1 - 9.
+	// The controls live on the title bar, at w.TitleRect().Y.
+	// They start at w.Rect.Right() - 1 - 9.
 	ctlStart := w.Rect.Right() - 1 - 9
 	minX := ctlStart + 1
-	titleY := w.Rect.Y + 1
+	titleY := w.TitleRect().Y
 
 	m.Update(tea.MouseClickMsg(tea.Mouse{X: minX, Y: titleY, Button: tea.MouseLeft}))
 	if w.State != wm.Minimized {
@@ -627,7 +650,7 @@ func TestWindowTitleButtons(t *testing.T) {
 
 	// Click on close [x]:
 	closeX := w.Rect.Right() - 1 - 9 + 7
-	closeY := w.Rect.Y + 1
+	closeY := w.TitleRect().Y
 	m.Update(tea.MouseClickMsg(tea.Mouse{X: closeX, Y: closeY, Button: tea.MouseLeft}))
 	if m.windows.Find("btnwin") != nil {
 		t.Error("expected window closed after [x] click")

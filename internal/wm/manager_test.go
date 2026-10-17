@@ -245,9 +245,9 @@ func TestSetWorkAreaKeepsWindowsVisible(t *testing.T) {
 }
 
 func TestContentRectLeavesRoomForChrome(t *testing.T) {
-	w := &Window{Rect: geom.Rect{X: 5, Y: 5, Width: 20, Height: 10}, TitleHeight: 1}
+	w := &Window{Rect: geom.Rect{X: 5, Y: 5, Width: 20, Height: 10}}
 
-	want := geom.Rect{X: 6, Y: 7, Width: 18, Height: 7}
+	want := geom.Rect{X: 6, Y: 6, Width: 18, Height: 8}
 	if got := w.ContentRect(); got != want {
 		t.Errorf("ContentRect() = %+v, want %+v", got, want)
 	}

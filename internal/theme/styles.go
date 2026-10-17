@@ -95,11 +95,10 @@ func NewStyles(t Theme) Styles {
 // WindowChrome returns the lipgloss styles for a window at a given size.
 // Focused and inactive windows get different border and title colors.
 //
-// lipgloss counts the border into the width and the height it is given, so the
-// frame takes the whole rectangle. Subtracting the border a second time made
-// the inner area two cells narrower than the label laid out for, and lipgloss
-// wrapped the title: the window controls fell onto a second row, under the
-// app's own content, where nobody could see or click them.
+// The frame is a plain border box: the caller blits the title over the top
+// border afterwards, so the title sits on the frame rather than consuming a
+// row inside it. lipgloss counts the border into the width and the height it
+// is given, so the frame takes the whole rectangle.
 func (s Styles) WindowChrome(focused bool, width, height int) (frame, title lipgloss.Style) {
 	frameStyle := s.Border
 	titleStyle := s.TitleDim

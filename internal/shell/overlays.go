@@ -83,9 +83,13 @@ func (m *Model) drawPanel(content string) {
 	m.screen.Blit(rect, m.panelStyle().Render(content))
 }
 
-// panelInset is how far the panel's own frame pushes its content inwards: one
-// cell for the border, one for the padding.
+// panelInset is how far the panel's own frame pushes its content inwards from
+// the left and right edges: one cell for the border, one for the padding.
 const panelInset = 2
+
+// panelTopInset is how far the panel's frame pushes its content down. The panel
+// pads only left and right, so the top inset is the border alone.
+const panelTopInset = 1
 
 // panelRect is where drawPanel puts a box of this content. An overlay that has
 // to know where its own rows landed asks here instead of guessing.

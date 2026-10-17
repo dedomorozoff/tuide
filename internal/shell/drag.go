@@ -1,8 +1,6 @@
 package shell
 
 import (
-	"strings"
-
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/dedomorozoff/tuide/internal/appsdk"
@@ -70,13 +68,12 @@ func (m *Model) onClick(msg tea.MouseClickMsg) tea.Cmd {
 	}
 	m.focus(w.ID)
 
-	// Check if click landed on title buttons [_][^][x]
+	// Check if click landed on title buttons [_][■][x]
 	if region == wm.RegionTitle {
 		innerWidth := max(0, w.Rect.Width-2)
-		left := windowLabel(w, true)
-		if innerWidth >= 9 && strings.HasSuffix(left, "[_][^][x]") {
-			// Window inner title starts at w.Rect.X + 1.
-			// The 9 characters "[_][^][x]" end at w.Rect.Right() - 2.
+		if innerWidth >= 9 {
+			// The title bar starts at w.Rect.X + 1.
+			// The 9-character control strip ends at w.Rect.Right() - 2.
 			ctlStart := w.Rect.Right() - 1 - 9
 			if mouse.X >= ctlStart && mouse.X < w.Rect.Right()-1 {
 				offset := mouse.X - ctlStart
@@ -84,7 +81,7 @@ func (m *Model) onClick(msg tea.MouseClickMsg) tea.Cmd {
 				case offset >= 0 && offset <= 2: // [_]
 					m.toggleMinimized(w.ID)
 					return nil
-				case offset >= 3 && offset <= 5: // [^]
+				case offset >= 3 && offset <= 5: // [■]
 					m.toggleMaximized(w.ID)
 					return nil
 				case offset >= 6 && offset <= 8: // [x]

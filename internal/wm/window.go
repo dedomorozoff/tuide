@@ -30,30 +30,29 @@ type Window struct {
 	// Floating is the geometry to go back to when tiling is switched off.
 	Floating geom.Rect
 
-	State       State
-	Workspace   int
-	Opened      int
-	TitleHeight int
+	State     State
+	Workspace int
+	Opened    int
 }
 
-// ContentRect is the area an app is allowed to draw into: inside the border,
-// below the title bar.
+// ContentRect is the area an app is allowed to draw into: inside the border.
 func (w *Window) ContentRect() geom.Rect {
 	return geom.Rect{
 		X:      w.Rect.X + 1,
-		Y:      w.Rect.Y + 1 + w.TitleHeight,
+		Y:      w.Rect.Y + 1,
 		Width:  w.Rect.Width - 2,
-		Height: w.Rect.Height - 2 - w.TitleHeight,
+		Height: w.Rect.Height - 2,
 	}
 }
 
-// TitleRect is the row the window manager draws the title on.
+// TitleRect is the row the window manager draws the title on: the top border,
+// between the two corners.
 func (w *Window) TitleRect() geom.Rect {
 	return geom.Rect{
 		X:      w.Rect.X + 1,
-		Y:      w.Rect.Y + 1,
+		Y:      w.Rect.Y,
 		Width:  max(0, w.Rect.Width-2),
-		Height: max(0, w.TitleHeight),
+		Height: 1,
 	}
 }
 
@@ -81,12 +80,17 @@ func (w *Window) RegionAt(x, y int) Region {
 	if !w.Rect.Contains(x, y) {
 		return RegionNone
 	}
-	if x == w.Rect.X || x == w.Rect.Right()-1 ||
-		y == w.Rect.Y || y == w.Rect.Bottom()-1 {
-		return RegionBorder
-	}
-	if y >= w.Rect.Y+1 && y < w.Rect.Y+1+w.TitleHeight {
+	// The top border carries the title bar, so its corners stay resize
+	// handles while the rest of the row drags the window.
+	if y == w.Rect.Y {
+		if x == w.Rect.X || x == w.Rect.Right()-1 {
+			return RegionBorder
+		}
 		return RegionTitle
+	}
+	if x == w.Rect.X || x == w.Rect.Right()-1 ||
+		y == w.Rect.Bottom()-1 {
+		return RegionBorder
 	}
 	return RegionContent
 }

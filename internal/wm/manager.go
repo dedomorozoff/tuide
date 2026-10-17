@@ -174,16 +174,15 @@ func (m *Manager) Open(spec appsdk.Spec) (*Window, error) {
 	m.step++
 
 	w := &Window{
-		ID:          spec.ID,
-		Spec:        spec,
-		App:         spec.Launch(),
-		Rect:        rect,
-		Restore:     rect,
-		Floating:    rect,
-		State:       Normal,
-		Workspace:   m.active,
-		Opened:      m.step,
-		TitleHeight: 1,
+		ID:        spec.ID,
+		Spec:      spec,
+		App:       spec.Launch(),
+		Rect:      rect,
+		Restore:   rect,
+		Floating:  rect,
+		State:     Normal,
+		Workspace: m.active,
+		Opened:    m.step,
 	}
 
 	m.windows = append(m.windows, w)

@@ -305,7 +305,7 @@ func (m *Model) launcherLayout() launcherLayout {
 	for i := range layout.rows {
 		layout.rows[i].rect = geom.Rect{
 			X:      layout.rect.X + panelInset,
-			Y:      layout.rect.Y + panelInset + launcherFirstRow + i,
+			Y:      layout.rect.Y + panelTopInset + launcherFirstRow + i,
 			Width:  max(0, layout.rect.Width-2*panelInset),
 			Height: 1,
 		}

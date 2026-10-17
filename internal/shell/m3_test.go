@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dedomorozoff/tuide/internal/appsdk"
 	"github.com/dedomorozoff/tuide/internal/compositor"
@@ -243,14 +244,14 @@ func TestRuntimeTitleReplacesTheSpecName(t *testing.T) {
 	w := m.windows.Windows()[0]
 	w.Rect.Width = 40
 
-	got := windowLabel(w, true)
+	got := ansi.Strip(m.windowLabel(w, true))
 	if !strings.Contains(got, "vim README.md") {
 		t.Fatalf("label = %q, want the runtime name", got)
 	}
 	if strings.Contains(got, w.Spec.Name) {
 		t.Fatalf("label = %q, want the spec name gone", got)
 	}
-	if !strings.HasSuffix(got, "[_][^][x]") {
+	if !strings.HasSuffix(got, "[_][■][x]") {
 		t.Fatalf("label = %q, want the controls kept", got)
 	}
 }
@@ -261,13 +262,13 @@ func TestRuntimeTitleIsCutToTheSpaceLeft(t *testing.T) {
 	_ = m.Init()
 
 	w := m.windows.Windows()[0]
-	got := windowLabel(w, true)
+	got := ansi.Strip(m.windowLabel(w, true))
 
 	if lipgloss.Width(got) > w.Rect.Width-2 {
 		t.Fatalf("label is %d wide, want no more than the %d it had",
 			lipgloss.Width(got), w.Rect.Width-2)
 	}
-	if !strings.HasSuffix(got, "[_][^][x]") {
+	if !strings.HasSuffix(got, "[_][■][x]") {
 		t.Fatalf("label = %q, want the window controls to survive", got)
 	}
 	if !strings.Contains(got, "...") {
@@ -283,7 +284,7 @@ func TestANarrowWindowStillShowsItsName(t *testing.T) {
 	w := m.windows.Windows()[0]
 	w.Rect.Width = 12
 
-	got := windowLabel(w, true)
+	got := ansi.Strip(m.windowLabel(w, true))
 	if lipgloss.Width(got) > 10 {
 		t.Fatalf("label = %q (%d wide), want it inside the 10 cell title bar", got, lipgloss.Width(got))
 	}

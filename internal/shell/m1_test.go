@@ -52,7 +52,8 @@ func TestTitleDragMovesWindow(t *testing.T) {
 
 	w := m.windows.Focused()
 	origin := w.Rect
-	titleX, titleY := w.Rect.X+2, w.Rect.Y+1
+	title := w.TitleRect()
+	titleX, titleY := title.X+1, title.Y
 
 	m.Update(tea.MouseClickMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
 	m.Update(tea.MouseMotionMsg(tea.Mouse{X: titleX + 5, Y: titleY + 3, Button: tea.MouseLeft}))
@@ -91,7 +92,8 @@ func TestReleaseNearEdgeSnapsWindow(t *testing.T) {
 	_ = m.Init()
 
 	w := m.windows.Focused()
-	titleX, titleY := w.Rect.X+2, w.Rect.Y+1
+	title := w.TitleRect()
+	titleX, titleY := title.X+1, title.Y
 
 	m.Update(tea.MouseClickMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
 	m.Update(tea.MouseMotionMsg(tea.Mouse{X: 1, Y: titleY, Button: tea.MouseLeft}))
@@ -108,7 +110,8 @@ func TestReleaseInTheMiddleKeepsWindowFloating(t *testing.T) {
 	_ = m.Init()
 
 	w := m.windows.Focused()
-	titleX, titleY := w.Rect.X+2, w.Rect.Y+1
+	title := w.TitleRect()
+	titleX, titleY := title.X+1, title.Y
 	middle := m.windows.WorkArea().Width / 2
 
 	m.Update(tea.MouseClickMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
@@ -127,7 +130,8 @@ func TestDragIsIgnoredWhileTiled(t *testing.T) {
 
 	w := m.windows.Focused()
 	before := w.Rect
-	titleX, titleY := w.Rect.X+2, w.Rect.Y+1
+	title := w.TitleRect()
+	titleX, titleY := title.X+1, title.Y
 
 	m.Update(tea.MouseClickMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
 	m.Update(tea.MouseMotionMsg(tea.Mouse{X: titleX + 6, Y: titleY + 2, Button: tea.MouseLeft}))

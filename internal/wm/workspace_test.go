@@ -407,8 +407,7 @@ func TestMintLayoutCoversAreaExactly(t *testing.T) {
 
 func TestRegionAt(t *testing.T) {
 	w := &Window{
-		Rect:        geom.Rect{X: 5, Y: 5, Width: 20, Height: 10},
-		TitleHeight: 1,
+		Rect: geom.Rect{X: 5, Y: 5, Width: 20, Height: 10},
 	}
 
 	cases := []struct {
@@ -419,9 +418,9 @@ func TestRegionAt(t *testing.T) {
 		{24, 5, RegionBorder},
 		{5, 14, RegionBorder},
 		{24, 14, RegionBorder},
-		{10, 5, RegionBorder},
-		{10, 6, RegionTitle},
-		{6, 6, RegionTitle},
+		{10, 5, RegionTitle},
+		{10, 6, RegionContent},
+		{6, 6, RegionContent},
 		{10, 7, RegionContent},
 		{4, 5, RegionNone},
 		{200, 200, RegionNone},
@@ -462,9 +461,9 @@ func TestEdgesAt(t *testing.T) {
 }
 
 func TestTitleRect(t *testing.T) {
-	w := &Window{Rect: geom.Rect{X: 5, Y: 5, Width: 20, Height: 10}, TitleHeight: 1}
+	w := &Window{Rect: geom.Rect{X: 5, Y: 5, Width: 20, Height: 10}}
 
-	want := geom.Rect{X: 6, Y: 6, Width: 18, Height: 1}
+	want := geom.Rect{X: 6, Y: 5, Width: 18, Height: 1}
 	if got := w.TitleRect(); got != want {
 		t.Errorf("TitleRect() = %+v, want %+v", got, want)
 	}

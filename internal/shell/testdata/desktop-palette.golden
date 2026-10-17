@@ -1,11 +1,11 @@
          ╭───────────────────────────────────────╮
          │ actions                               │
-       ╭─│                                       │──╮
-       │*│ >                                     │x]│
-       │t│                                       │  │
-       │4│ > Close window                        │  │
-       │ │   Maximize window                     │  │
-       │c│   Minimize window                     │ns│
+       ╭*│                                       │x]╮
+       │t│ >                                     │  │
+       │4│                                       │  │
+       │ │ > Close window                        │  │
+       │c│   Maximize window                     │ns│
+       │ │   Minimize window                     │  │
        │ │   Snap left                           │  │
        │ │   Snap right                          │  │
        │ │   Snap top                            │  │
