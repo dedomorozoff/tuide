@@ -74,6 +74,11 @@ type Spec struct {
 	MinWidth      int
 	MinHeight     int
 
+	// Multi allows several windows of the app at once. Launching a Multi app
+	// that is already running opens another instance instead of switching to
+	// the open one, which is what a terminal needs and settings does not.
+	Multi bool
+
 	Launch func() App
 }
 

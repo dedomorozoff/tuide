@@ -211,6 +211,99 @@ func TestToggleMaximizedRoundTrip(t *testing.T) {
 	}
 }
 
+func TestMaximizeZoomsATiledWindowOut(t *testing.T) {
+	m := newManager()
+	a, _ := m.Open(spec("a"))
+	b, _ := m.Open(spec("b"))
+	m.SetLayout(LayoutTiled)
+
+	area := m.WorkArea()
+	if err := m.ToggleMaximized(a.ID); err != nil {
+		t.Fatalf("ToggleMaximized: %v", err)
+	}
+
+	if a.State != Maximized || a.Rect != area {
+		t.Errorf("zoomed window = state %v rect %+v, want maximized over %+v", a.State, a.Rect, area)
+	}
+	if b.State != Normal || b.Rect != area {
+		t.Errorf("the last tile while a zoomed window is up = %+v, want the freed area %+v", b.Rect, area)
+	}
+
+	if err := m.ToggleMaximized(a.ID); err != nil {
+		t.Fatalf("ToggleMaximized: %v", err)
+	}
+	if a.State != Normal {
+		t.Errorf("unzoomed state = %v, want normal", a.State)
+	}
+	slots := mintLayout(area, 2)
+	if a.Rect != slots[0] || b.Rect != slots[1] {
+		t.Errorf("after unzoom a = %+v, b = %+v, want the grid %+v", a.Rect, b.Rect, slots)
+	}
+}
+
+func TestTiledZoomTracksWorkAreaChanges(t *testing.T) {
+	m := newManager()
+	a, _ := m.Open(spec("a"))
+	m.SetLayout(LayoutTiled)
+
+	if err := m.ToggleMaximized(a.ID); err != nil {
+		t.Fatalf("ToggleMaximized: %v", err)
+	}
+	m.SetWorkArea(geom.Rect{Width: 60, Height: 20})
+	if a.Rect != m.WorkArea() {
+		t.Errorf("zoomed window = %+v, want the new work area %+v", a.Rect, m.WorkArea())
+	}
+}
+
+func TestZoomFollowsTheFocusWhileTiled(t *testing.T) {
+	m := newManager()
+	a, _ := m.Open(spec("a"))
+	b, _ := m.Open(spec("b"))
+	_, _ = m.Open(spec("c"))
+	m.SetLayout(LayoutTiled)
+	area := m.WorkArea()
+
+	if err := m.ToggleMaximized(a.ID); err != nil {
+		t.Fatalf("ToggleMaximized: %v", err)
+	}
+	if err := m.Focus(b.ID); err != nil {
+		t.Fatalf("Focus: %v", err)
+	}
+
+	if b.State != Maximized || b.Rect != area {
+		t.Errorf("the newly focused window = state %v rect %+v, want the zoom", b.State, b.Rect)
+	}
+	slots := mintLayout(area, 2)
+	if a.State != Normal || a.Rect != slots[0] || a.Rect == area {
+		t.Errorf("the previously zoomed window = state %v rect %+v, want its slot %+v", a.State, a.Rect, slots[0])
+	}
+
+	// The cycle wraps around to a and carries the zoom with it.
+	m.Cycle(1)
+	if a.State != Maximized || a.Rect != area {
+		t.Errorf("cycled window = state %v rect %+v, want the zoom on a", a.State, a.Rect)
+	}
+	// b folds back onto the master slot it holds in the open order.
+	if b.State != Normal || b.Rect != slots[0] {
+		t.Errorf("the previous zoom should fold back: state %v, rect %+v, want %+v", b.State, b.Rect, slots[0])
+	}
+}
+
+func TestZoomDiesWithTheLayoutSwitch(t *testing.T) {
+	m := newManager()
+	a, _ := m.Open(spec("a"))
+	m.SetLayout(LayoutTiled)
+
+	if err := m.ToggleMaximized(a.ID); err != nil {
+		t.Fatalf("ToggleMaximized: %v", err)
+	}
+	m.SetLayout(LayoutFloating)
+
+	if a.State != Normal || a.Rect != a.Floating {
+		t.Errorf("after the switch to floating state = %v, rect = %+v, want the floating slot back", a.State, a.Rect)
+	}
+}
+
 func TestToggleMinimizedHidesFromHitTest(t *testing.T) {
 	m := newManager()
 	w, _ := m.Open(spec("a"))

@@ -1,6 +1,8 @@
 package shell
 
 import (
+	"time"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/dedomorozoff/tuide/internal/appsdk"
@@ -11,6 +13,10 @@ import (
 // dragSnapMargin is how many cells from a work-area edge a window must be
 // dropped before it snaps to that edge.
 const dragSnapMargin = 2
+
+// doubleClickGap is how long after a click a second one on the same cell is
+// still the same double click gesture.
+const doubleClickGap = 400 * time.Millisecond
 
 type dragKind int
 
@@ -30,6 +36,28 @@ type dragState struct {
 	startX int
 	startY int
 	edges  wm.Edges
+	// unfold marks a move gesture that started on a maximized or zoomed window:
+	// the first real motion folds the window back and the drag goes on from
+	// its restored size. moved remembers whether the pointer really moved, so a
+	// held press never snaps and a released click stays a click.
+	unfold bool
+	moved  bool
+}
+
+// lastClick remembers one mouse click, so the next one can recognize the pair.
+type lastClick struct {
+	at time.Time
+	x  int
+	y  int
+}
+
+// doubleClick reports whether this click and the remembered one form a double
+// click on the same cell.
+func (m *Model) doubleClick(mouse tea.Mouse) bool {
+	pair := !m.memo.at.IsZero() && time.Since(m.memo.at) <= doubleClickGap &&
+		m.memo.x == mouse.X && m.memo.y == mouse.Y
+	m.memo = lastClick{at: time.Now(), x: mouse.X, y: mouse.Y}
+	return pair
 }
 
 // active reports whether a gesture is in progress.
@@ -91,15 +119,24 @@ func (m *Model) onClick(msg tea.MouseClickMsg) tea.Cmd {
 		}
 	}
 
+	// Like in a window manager on the desktop, a second click on the title
+	// bar is the maximize/restore gesture, doubling as zoom while tiling.
+	if region == wm.RegionTitle && m.doubleClick(mouse) {
+		m.toggleMaximized(w.ID)
+		return nil
+	}
+
 	// A program that tracks the pointer inside the window owns it: the shell
 	// must not turn its clicks into a drag.
 	if region == wm.RegionContent && appOwnsPointer(w) {
 		return m.windows.Update(msg)
 	}
 
-	// Tiled and maximized windows own their geometry, so there is nothing
-	// to drag.
-	if m.windows.Layout() == wm.LayoutTiled || w.State == wm.Maximized {
+	// Tiled and maximized windows own their geometry, so there is nothing to
+	// drag — except the title of a maximized one, where grabbing starts the
+	// unfold gesture.
+	if (m.windows.Layout() == wm.LayoutTiled || w.State == wm.Maximized) &&
+		!(region == wm.RegionTitle && w.State == wm.Maximized) {
 		return nil
 	}
 
@@ -111,6 +148,7 @@ func (m *Model) onClick(msg tea.MouseClickMsg) tea.Cmd {
 			origin: w.Rect,
 			startX: mouse.X,
 			startY: mouse.Y,
+			unfold: w.State == wm.Maximized,
 		}
 	case wm.RegionBorder:
 		if edges.Empty() {
@@ -147,15 +185,53 @@ func appOwnsPointer(w *wm.Window) bool {
 	return ok && consumer.OwnsPointer()
 }
 
+// unfoldWindow hands a maximized or zoomed window its restored geometry back,
+// waiting for a drag away from the title. A zoom that came from tiling ends the
+// arrangement altogether: tiling owns geometry, so a manual pull switches the
+// desktop to floating windows.
+func (m *Model) unfoldWindow(w *wm.Window) {
+	if m.windows.Layout() == wm.LayoutTiled {
+		m.windows.SetLayout(wm.LayoutFloating)
+	}
+	if w.State == wm.Maximized {
+		m.toggleMaximized(w.ID)
+	}
+	m.moveWindow(w.ID, w.Restore)
+}
+
 func (m *Model) onMotion(msg tea.MouseMotionMsg) tea.Cmd {
 	mouse := msg.Mouse()
 	if m.drag.kind == dragNone {
 		return m.consumeMouse(msg, mouse)
 	}
-	if m.windows.Find(m.drag.id) == nil {
+	w := m.windows.Find(m.drag.id)
+	if w == nil {
 		m.drag = dragState{}
 		return nil
 	}
+
+	// The first real motion under a grab of a maximized window folds it back.
+	// The anchor moves with the restore, so the cursor keeps holding the title
+	// at the place it grabbed and the drag continues from there.
+	if m.drag.unfold && (mouse.X != m.drag.startX || mouse.Y != m.drag.startY) {
+		maximized := m.drag.origin
+		grab := m.drag.startX - maximized.X
+		if grab < 0 {
+			grab = 0
+		}
+
+		m.unfoldWindow(w)
+
+		if maximized.Width > 0 {
+			grab = grab * w.Rect.Width / maximized.Width
+		}
+		m.drag.origin = w.Rect
+		m.drag.startX = w.Rect.X + grab
+		m.drag.startY = mouse.Y
+		m.drag.unfold = false
+	}
+
+	m.drag.moved = true
 
 	dx := mouse.X - m.drag.startX
 	dy := mouse.Y - m.drag.startY
@@ -246,13 +322,16 @@ func (m *Model) onRelease(msg tea.MouseReleaseMsg) tea.Cmd {
 	}
 
 	id := m.drag.id
+	moved := m.drag.moved
 	m.drag = dragState{}
 
 	if m.windows.Find(id) == nil {
 		return nil
 	}
-	if zone := wm.DropZone(mouse.X, mouse.Y, m.windows.WorkArea(), dragSnapMargin); zone != wm.ZoneNone {
-		m.snap(id, zone)
+	if moved {
+		if zone := wm.DropZone(mouse.X, mouse.Y, m.windows.WorkArea(), dragSnapMargin); zone != wm.ZoneNone {
+			m.snap(id, zone)
+		}
 	}
 	return nil
 }

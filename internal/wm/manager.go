@@ -82,6 +82,7 @@ func (m *Manager) SetLayout(layout Layout) {
 
 	for _, w := range m.windows {
 		w.Rect = m.clampToWork(w, w.Floating)
+		w.State = Normal
 	}
 }
 
@@ -206,6 +207,7 @@ func (m *Manager) Focus(id string) error {
 	}
 	m.raise(w)
 	m.focusedID = id
+	m.settleZoom()
 	return nil
 }
 
@@ -261,6 +263,7 @@ func (m *Manager) Cycle(step int) {
 	}
 	m.raise(next)
 	m.focusedID = next.ID
+	m.settleZoom()
 }
 
 // Close removes a window and hands focus to the one below it.
@@ -328,13 +331,22 @@ func (m *Manager) Snap(id string, zone Zone) error {
 }
 
 // ToggleMaximized swaps a window between its restored size and the work area.
-// Tiling already fills the work area, so maximize is a no-op there.
+// With tiling on it folds a window out of the tiled grid instead: the zoomed
+// window takes the whole work area while the rest keep their tiling slots, and
+// folding it back returns it to the slot it had.
 func (m *Manager) ToggleMaximized(id string) error {
 	w := m.Find(id)
 	if w == nil {
 		return fmt.Errorf("wm: maximize %s: %w", id, ErrNoWindow)
 	}
 	if m.layout == LayoutTiled {
+		if w.State == Maximized {
+			w.State = Normal
+		} else {
+			w.State = Maximized
+			w.Restore = w.Rect
+		}
+		m.arrange()
 		return nil
 	}
 
@@ -448,11 +460,44 @@ func (m *Manager) raise(w *Window) {
 	m.windows = append(m.windows, w)
 }
 
+// settleZoom keeps the one tiled zoom on the window that has the focus. With
+// the zoom in place alt-tab walks full-screen windows, and the zoomed one can
+// never hide behind another. Nothing to migrate when no zoom or no focus move
+// is in play.
+func (m *Manager) settleZoom() {
+	if m.layout != LayoutTiled {
+		return
+	}
+	var kept, stray *Window
+	for _, w := range m.visible() {
+		if w.State != Maximized {
+			continue
+		}
+		if w.ID == m.focusedID {
+			kept = w
+		} else if stray == nil {
+			stray = w
+		} else {
+			w.State = Normal
+		}
+	}
+	if stray != nil {
+		stray.State = Normal
+		if kept == nil {
+			if w := m.Focused(); w != nil && w.State == Normal {
+				w.State = Maximized
+			}
+		}
+	}
+	m.arrange()
+}
+
 func (m *Manager) focusTop() {
 	for i := len(m.windows) - 1; i >= 0; i-- {
 		w := m.windows[i]
 		if w.Workspace == m.active && w.State != Minimized {
 			m.focusedID = w.ID
+			m.settleZoom()
 			return
 		}
 	}

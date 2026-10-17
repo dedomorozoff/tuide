@@ -3,6 +3,7 @@
 package shell
 
 import (
+	"fmt"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -54,6 +55,9 @@ type Model struct {
 
 	// drag is the mouse gesture in flight, if any.
 	drag dragState
+	// memo remembers the last mouse click, so the next one can be told apart
+	// as a double click.
+	memo lastClick
 	// snapLast remembers where each window was last snapped so two
 	// perpendicular snaps combine into a quarter.
 	snapLast map[string]wm.Zone
@@ -316,11 +320,29 @@ func (m *Model) launch(id string) tea.Cmd {
 		m.lastErr = ErrUnknownApp
 		return nil
 	}
-	if existing := m.windows.Find(id); existing != nil {
-		if err := m.windows.Reveal(existing.ID); err != nil {
-			m.lastErr = err
+	if m.windows.Find(id) != nil {
+		if !spec.Multi {
+			if err := m.windows.Reveal(spec.ID); err != nil {
+				m.lastErr = err
+			}
+			return nil
 		}
-		return nil
+		// A Multi app just gets one more window, numbered past the ones open.
+		unique := spec
+		n := 2
+		for {
+			unique.ID = fmt.Sprintf("%s-%d", spec.ID, n)
+			if m.windows.Find(unique.ID) == nil {
+				break
+			}
+			n++
+		}
+		w, err := m.windows.Open(unique)
+		if err != nil {
+			m.lastErr = err
+			return nil
+		}
+		return w.App.Init()
 	}
 	w, err := m.windows.Open(spec)
 	if err != nil {

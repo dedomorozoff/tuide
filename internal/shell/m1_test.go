@@ -31,6 +31,12 @@ func stubSpec(id string) appsdk.Spec {
 	}
 }
 
+func stubMultiSpec(id string) appsdk.Spec {
+	s := stubSpec(id)
+	s.Multi = true
+	return s
+}
+
 // newMultiDesktop builds a desktop with the named stub windows already open.
 func newMultiDesktop(ids ...string) *Model {
 	specs := make([]appsdk.Spec, 0, len(ids))
@@ -64,6 +70,83 @@ func TestTitleDragMovesWindow(t *testing.T) {
 	}
 	if m.drag.kind != dragNone {
 		t.Error("the drag should be finished after release")
+	}
+}
+
+// doubleClickTitle sends a click pair on the window's title bar.
+func doubleClickTitle(t *testing.T, m *Model, w *wm.Window) {
+	t.Helper()
+	x, y := w.TitleRect().X+1, w.TitleRect().Y
+	m.Update(tea.MouseClickMsg(tea.Mouse{X: x, Y: y, Button: tea.MouseLeft}))
+	m.Update(tea.MouseReleaseMsg(tea.Mouse{X: x, Y: y, Button: tea.MouseLeft}))
+	_, _ = m.Update(tea.MouseClickMsg(tea.Mouse{X: x, Y: y, Button: tea.MouseLeft}))
+	m.Update(tea.MouseReleaseMsg(tea.Mouse{X: x, Y: y, Button: tea.MouseLeft}))
+	// Break the pair, so the next gesture starts from a clean click.
+	m.memo = lastClick{}
+}
+
+func TestDoubleClickTitleMaximizesAndRestores(t *testing.T) {
+	m := newMultiDesktop("a", "b")
+	_ = m.Init()
+
+	w := m.windows.Find("a")
+	if w == nil {
+		t.Fatal("window a not found")
+	}
+	m.focus("a")
+	origin := w.Rect
+
+	doubleClickTitle(t, m, w)
+
+	if w.State != wm.Maximized {
+		t.Fatalf("state after the double click = %v, want maximized", w.State)
+	}
+	if w.Rect != m.windows.WorkArea() {
+		t.Errorf("rect = %+v, want the work area %+v", w.Rect, m.windows.WorkArea())
+	}
+
+	doubleClickTitle(t, m, w)
+
+	if w.State != wm.Normal || w.Rect != origin {
+		t.Errorf("after the second double click state = %v, rect = %+v, want normal %+v", w.State, w.Rect, origin)
+	}
+}
+
+func TestDoubleClickTitleZoomsATiledWindow(t *testing.T) {
+	m := newMultiDesktop("a", "b")
+	_ = m.Init()
+	m.windows.SetLayout(wm.LayoutTiled)
+
+	w := m.windows.Find("a")
+	doubleClickTitle(t, m, w)
+
+	if w.State != wm.Maximized || w.Rect != m.windows.WorkArea() {
+		t.Fatalf("zoom = state %v rect %+v, want maximized over %+v", w.State, w.Rect, m.windows.WorkArea())
+	}
+
+	doubleClickTitle(t, m, w)
+
+	if w.State != wm.Normal || !m.windows.WorkArea().ContainsRect(w.Rect) {
+		t.Errorf("unzoom = state %v rect %+v, want the window back inside the tiling", w.State, w.Rect)
+	}
+}
+
+func TestSingleClicksDoNotMaximize(t *testing.T) {
+	m := newMultiDesktop("a")
+	_ = m.Init()
+
+	w := m.windows.Focused()
+	titleX, titleY := w.TitleRect().X+1, w.TitleRect().Y
+
+	m.Update(tea.MouseClickMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
+	m.Update(tea.MouseReleaseMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
+	// The first click now looks long enough in the past to break the pair.
+	m.memo.at = m.memo.at.Add(-2 * doubleClickGap)
+	m.Update(tea.MouseClickMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
+	m.Update(tea.MouseReleaseMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
+
+	if w.State == wm.Maximized {
+		t.Error("two well spaced clicks must not read as a double click")
 	}
 }
 
@@ -120,6 +203,81 @@ func TestReleaseInTheMiddleKeepsWindowFloating(t *testing.T) {
 
 	if w.Rect.Width != 24 || w.Rect.Height != 10 {
 		t.Errorf("window should keep its size when dropped away from an edge: %+v", w.Rect)
+	}
+}
+
+func TestDraggingTheTitleUnfoldsAMaximizedWindow(t *testing.T) {
+	m := newMultiDesktop("a")
+	_ = m.Init()
+
+	w := m.windows.Focused()
+	restored := w.Rect
+	if err := m.windows.ToggleMaximized(w.ID); err != nil {
+		t.Fatalf("ToggleMaximized: %v", err)
+	}
+	titleX, titleY := w.TitleRect().X+3, w.TitleRect().Y
+
+	m.Update(tea.MouseClickMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
+	m.Update(tea.MouseMotionMsg(tea.Mouse{X: titleX + 1, Y: titleY, Button: tea.MouseLeft}))
+	m.Update(tea.MouseMotionMsg(tea.Mouse{X: titleX + 6, Y: titleY + 5, Button: tea.MouseLeft}))
+	m.Update(tea.MouseReleaseMsg(tea.Mouse{X: titleX + 6, Y: titleY + 5, Button: tea.MouseLeft}))
+
+	if w.State != wm.Normal {
+		t.Fatalf("state during the drag = %v, want normal", w.State)
+	}
+	if w.Rect == m.windows.WorkArea() {
+		t.Fatalf("rect = %+v, the drag should have moved it off the work area", w.Rect)
+	}
+	if w.Rect.Width != restored.Width || w.Rect.Height != restored.Height {
+		t.Errorf("rect = %+v, want the restored size from %+v", w.Rect, restored)
+	}
+}
+
+func TestGrabbingTheZoomedTitleEndsTheTiling(t *testing.T) {
+	m := newMultiDesktop("a", "b")
+	_ = m.Init()
+	m.windows.SetLayout(wm.LayoutTiled)
+
+	w := m.windows.Find("a")
+	if err := m.windows.ToggleMaximized(w.ID); err != nil {
+		t.Fatalf("ToggleMaximized: %v", err)
+	}
+	zoom := w.Rect
+	titleX, titleY := w.TitleRect().X+3, w.TitleRect().Y
+
+	m.Update(tea.MouseClickMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
+	m.Update(tea.MouseMotionMsg(tea.Mouse{X: titleX + 2, Y: titleY, Button: tea.MouseLeft}))
+	m.Update(tea.MouseReleaseMsg(tea.Mouse{X: titleX + 2, Y: titleY, Button: tea.MouseLeft}))
+
+	if m.windows.Layout() != wm.LayoutFloating {
+		t.Errorf("layout = %v, want floating after a manual pull", m.windows.Layout())
+	}
+	if w.State != wm.Normal {
+		t.Errorf("state = %v, want the zoom off", w.State)
+	}
+	if w.Rect == zoom || w.Rect == m.windows.WorkArea() {
+		t.Errorf("rect = %+v, want the restored geometry under the cursor", w.Rect)
+	}
+
+	other := m.windows.Find("b")
+	if other.State != wm.Normal {
+		t.Errorf("the window left behind = %v, want normal slotted", other.State)
+	}
+}
+
+func TestClickOnAMaximizedTitleWithoutMotionKeepsTheZoom(t *testing.T) {
+	m := newMultiDesktop("a")
+	_ = m.Init()
+
+	w := m.windows.Focused()
+	m.windows.ToggleMaximized(w.ID)
+	titleX, titleY := w.TitleRect().X+3, w.TitleRect().Y
+
+	m.Update(tea.MouseClickMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
+	m.Update(tea.MouseReleaseMsg(tea.Mouse{X: titleX, Y: titleY, Button: tea.MouseLeft}))
+
+	if w.State != wm.Maximized {
+		t.Errorf("state = %v, want maximized after a press without motion", w.State)
 	}
 }
 
@@ -203,6 +361,45 @@ func TestLaunchingAnOpenWindowFollowsItToItsWorkspace(t *testing.T) {
 	}
 	if m.windows.Count() != 1 {
 		t.Errorf("launching an open app must not open a second window, got %d", m.windows.Count())
+	}
+}
+
+func TestMultiAppLaunchesAnotherWindow(t *testing.T) {
+	m := newMultiDesktop()
+	m.specs["a"] = stubMultiSpec("a")
+	m.options.Launch = []string{"a"}
+	_ = m.Init()
+
+	if m.windows.Count() != 1 {
+		t.Fatalf("count = %d, want one window", m.windows.Count())
+	}
+
+	m.launch("a")
+	if m.windows.Count() != 2 {
+		t.Fatalf("launching a Multi app again = %d windows, want two", m.windows.Count())
+	}
+	if m.windows.Find("a-2") == nil {
+		t.Fatal("the second instance must be named a-2")
+	}
+
+	m.launch("a")
+	if m.windows.Count() != 3 || m.windows.Find("a-3") == nil {
+		t.Fatalf("a third launch gave %d windows, want a-3 among them", m.windows.Count())
+	}
+}
+
+func TestMultiAppIdsDoNotCollideAfterAClose(t *testing.T) {
+	m := newMultiDesktop()
+	m.specs["a"] = stubMultiSpec("a")
+	m.options.Launch = []string{"a"}
+	_ = m.Init()
+
+	m.launch("a")
+	m.windows.Close("a-2")
+	m.launch("a")
+
+	if m.windows.Find("a-2") == nil {
+		t.Fatal("a free id must be reused, the next instance should be a-2 again")
 	}
 }
 

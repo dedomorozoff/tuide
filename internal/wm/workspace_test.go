@@ -281,7 +281,7 @@ func TestLeavingTiledLayoutRestoresFloatingGeometry(t *testing.T) {
 	}
 }
 
-func TestTiledModeIgnoresMoveAndMaximize(t *testing.T) {
+func TestTiledModeIgnoresManualMove(t *testing.T) {
 	m := newManager()
 	w, _ := m.Open(spec("a"))
 	m.SetLayout(LayoutTiled)
@@ -292,13 +292,6 @@ func TestTiledModeIgnoresMoveAndMaximize(t *testing.T) {
 	}
 	if w.Rect != tiled {
 		t.Error("tiled windows should not be moved by hand")
-	}
-
-	if err := m.ToggleMaximized(w.ID); err != nil {
-		t.Fatalf("ToggleMaximized: %v", err)
-	}
-	if w.State != Normal {
-		t.Error("maximize should be a no-op while tiled")
 	}
 }
 

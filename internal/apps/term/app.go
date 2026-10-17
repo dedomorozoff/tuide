@@ -71,6 +71,7 @@ func Spec(t theme.Theme) appsdk.Spec {
 		DefaultHeight: 24,
 		MinWidth:      20,
 		MinHeight:     6,
+		Multi:         true,
 		Launch:        func() appsdk.App { return New(t) },
 	}
 }

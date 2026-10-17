@@ -38,15 +38,27 @@ func (m *Manager) arrange() {
 		return
 	}
 
-	ordered := tilingOrder(m.visible())
-	rects := mintLayout(m.workArea, len(ordered))
+	// A zoomed window folds out of the grid and takes the whole work area;
+	// the windows behind it keep tiling the space they had.
+	var zoomed, slotted []*Window
+	for _, w := range tilingOrder(m.visible()) {
+		if w.State == Maximized {
+			zoomed = append(zoomed, w)
+		} else {
+			slotted = append(slotted, w)
+		}
+	}
 
-	for i, w := range ordered {
+	rects := mintLayout(m.workArea, len(slotted))
+	for i, w := range slotted {
 		if i >= len(rects) {
 			break
 		}
 		w.Rect = rects[i]
 		w.State = Normal
+	}
+	for _, w := range zoomed {
+		w.Rect = m.workArea
 	}
 }
 
