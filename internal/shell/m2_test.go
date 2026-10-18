@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/dedomorozoff/tuide/internal/apps/settings"
 	"github.com/dedomorozoff/tuide/internal/appsdk"
 	"github.com/dedomorozoff/tuide/internal/config"
 	"github.com/dedomorozoff/tuide/internal/input"
@@ -38,6 +39,16 @@ func TestLauncherKeyOpensOverlay(t *testing.T) {
 	}
 	if m.launcher.mode != launcherApps {
 		t.Error("ctrl+alt+space should open the app launcher, not the palette")
+	}
+}
+
+func TestBareCtrlPKeyOpensOverlay(t *testing.T) {
+	m := launcherDesktop()
+
+	press(t, m, tea.Key{Code: 'p', Mod: tea.ModCtrl})
+	if !m.launcher.open || m.launcher.mode != launcherApps {
+		t.Fatalf("ctrl+p should open the app launcher, got open=%v mode=%v",
+			m.launcher.open, m.launcher.mode)
 	}
 }
 
@@ -122,6 +133,25 @@ func TestLauncherArrowsMoveSelection(t *testing.T) {
 	press(t, m, tea.Key{Code: tea.KeyUp})
 	if m.launcher.selected != 2 {
 		t.Errorf("selection after up from 0 = %d, want 2", m.launcher.selected)
+	}
+}
+
+func TestPaletteListsTheCalendar(t *testing.T) {
+	m := newTestDesktop()
+	_ = m.Init()
+	m.openLauncher(launcherActions)
+
+	for _, r := range "cal" {
+		press(t, m, tea.Key{Code: r, Text: string(r)})
+	}
+
+	row := launcherRowWithLabel(t, m, "Calendar")
+	if cmd := m.runLauncherRow(row); cmd != nil {
+		_ = cmd()
+	}
+
+	if !m.calendar.open {
+		t.Error("the palette's calendar row should open the month view")
 	}
 }
 
@@ -296,6 +326,86 @@ func TestLauncherOpensAboveTheStartButton(t *testing.T) {
 	if layout.rect.Bottom() != bottom {
 		t.Errorf("launcher bottom = %d, want just above the taskbar at %d",
 			layout.rect.Bottom(), bottom)
+	}
+}
+
+// TestStartButtonPaintsEveryCellOfItsOwn pins the trap the mark is built for: a
+// styled string nested inside another one loses its background where the inner
+// reset lands, and a taskbar cell without a background hands the host
+// terminal's colours through. The button is two styled panes plus two padding
+// cells, so each of the four has to name the chip's own background.
+func TestStartButtonPaintsEveryCellOfItsOwn(t *testing.T) {
+	m := newTestDesktop()
+	_ = m.Init()
+
+	styles := theme.NewStyles(theme.Get(theme.DefaultName))
+	cases := []struct {
+		name       string
+		open       bool
+		background string
+	}{
+		{"closed", false, theme.Background(styles.Theme.Accent)},
+		{"open", true, theme.Background(styles.Theme.TextStrong)},
+	}
+
+	for _, tc := range cases {
+		if tc.open {
+			m.openLauncher(launcherApps)
+		} else {
+			m.launcher.open = false
+		}
+		_ = m.View()
+
+		rect := m.startRect()
+		for x := rect.X; x < rect.Right(); x++ {
+			if got := m.screen.At(x, rect.Y).Background; got != tc.background {
+				t.Errorf("%s: cell %d background = %q, want %q",
+					tc.name, x, got, tc.background)
+			}
+		}
+	}
+}
+
+func TestStartButtonLabelComesFromTheConfig(t *testing.T) {
+	m := launcherDesktop()
+	m.applyConfig(config.Config{Theme: theme.DefaultName, Taskbar: true, Mouse: true, StartLabel: "menu"})
+
+	button := m.startButton()
+	if !strings.Contains(button, "menu") {
+		t.Errorf("button = %q, want the configured label", button)
+	}
+	if strings.Contains(button, startPaneLit) {
+		t.Errorf("button = %q, want the built-in mark replaced by the label", button)
+	}
+
+	m.applyConfig(config.Config{Theme: theme.DefaultName, Taskbar: true, Mouse: true})
+	if !strings.Contains(m.startButton(), startPaneLit) {
+		t.Error("an empty label should fall back to the built-in mark")
+	}
+}
+
+func TestStartButtonLabelCannotEatTheBar(t *testing.T) {
+	m := launcherDesktop()
+	m.applyConfig(config.Config{
+		Theme:      theme.DefaultName,
+		Taskbar:    true,
+		Mouse:      true,
+		StartLabel: strings.Repeat("m", 3*startLabelMax),
+	})
+
+	if got := m.startRect().Width; got > startLabelMax+2 {
+		t.Errorf("button width = %d, want at most %d", got, startLabelMax+2)
+	}
+}
+
+func TestStartButtonShowsItsOpenState(t *testing.T) {
+	m := newTestDesktop()
+	_ = m.Init()
+
+	closed := m.startButton()
+	m.openLauncher(launcherApps)
+	if open := m.startButton(); open == closed {
+		t.Error("an open launcher should change how the button looks")
 	}
 }
 
@@ -512,6 +622,25 @@ func TestTaskbarClockShowsTickTime(t *testing.T) {
 	}
 }
 
+func TestNetworkLightOnlyShowsWhenTheProbeFailed(t *testing.T) {
+	m := newTestDesktop()
+	_ = m.Init()
+
+	if got := m.statusIndicators(); got != "" {
+		t.Errorf("status = %q, want silence before the first probe came back", got)
+	}
+
+	m.Update(netMsg(true))
+	if got := m.statusIndicators(); got != "" {
+		t.Errorf("status = %q, want silence while the network is up", got)
+	}
+
+	m.Update(netMsg(false))
+	if got := m.statusIndicators(); !strings.Contains(got, "offline") {
+		t.Errorf("status = %q, want a warning once a probe has failed", got)
+	}
+}
+
 func TestLauncherOverlayFrame(t *testing.T) {
 	m := newTestDesktop()
 	_ = m.Init()
@@ -536,6 +665,10 @@ func TestDefaultsIncludeLauncherKeys(t *testing.T) {
 	action, ok = keymap.Lookup(tea.KeyPressMsg(tea.Key{Code: 'a', Mod: tea.ModCtrl | tea.ModAlt}))
 	if !ok || action != input.ActionOpenPalette {
 		t.Errorf("ctrl+alt+a = %q, %v, want open-palette", action, ok)
+	}
+	action, ok = keymap.Lookup(tea.KeyPressMsg(tea.Key{Code: 'p', Mod: tea.ModCtrl}))
+	if !ok || action != input.ActionOpenLauncher {
+		t.Errorf("ctrl+p = %q, %v, want open-launcher", action, ok)
 	}
 }
 
@@ -611,6 +744,85 @@ func TestConfigRequestAndSave(t *testing.T) {
 			_ = replyCmd()
 		}
 	}
+}
+
+// TestSettingsLabelRowPaintsEveryCellOfItsOwn pins the trap the row is built
+// for: the cursor cell is styled apart from the selection around it, so the row
+// has to be assembled from separately styled pieces. A single string wrapped in
+// the selection style would lose its background where the cursor's reset lands,
+// and the window body would show through the rest of the line.
+func TestSettingsLabelRowPaintsEveryCellOfItsOwn(t *testing.T) {
+	palette := theme.Get(theme.DefaultName)
+	m := New(palette, []appsdk.Spec{settings.Spec(palette)}, Options{
+		Width:   80,
+		Height:  24,
+		Taskbar: true,
+		Mouse:   true,
+		Launch:  []string{"settings"},
+	})
+	m.now = time.Date(2026, time.October, 11, 21, 45, 0, 0, time.UTC)
+	_ = m.Init()
+
+	w := m.windows.Find("settings")
+	if w == nil {
+		t.Fatal("the settings window did not open")
+	}
+	if _, cmd := m.Update(appsdk.RequestConfig{}); cmd != nil {
+		_ = cmd()
+	}
+
+	// Into the label row, and one letter into the draft: the row on screen ends
+	// up wider than the label it started from.
+	for range 3 {
+		press(t, m, tea.Key{Code: tea.KeyDown})
+	}
+	press(t, m, tea.Key{Code: tea.KeyEnter})
+	press(t, m, tea.Key{Code: 'g', Text: "g"})
+
+	_ = m.View()
+
+	styles := theme.NewStyles(palette)
+	selection := theme.Background(styles.Theme.Selection)
+	active := theme.Background(styles.Theme.Cursor)
+
+	cursorX, cursorY, ok := cursorCell(m, w)
+	if !ok {
+		t.Fatal("the focused window shows no cursor: the label is not in edit mode")
+	}
+
+	row := ""
+	for x := cursorX; x < w.Rect.Right()-1; x++ {
+		cell := m.screen.At(x, cursorY)
+		if cell.Background != selection && cell.Background != active {
+			break
+		}
+		row += cell.Text
+	}
+	for x := cursorX - 1; x > w.Rect.X; x-- {
+		cell := m.screen.At(x, cursorY)
+		if cell.Background != selection {
+			break
+		}
+		row = cell.Text + row
+	}
+
+	if want := "> Start:     [g ]"; row != want {
+		t.Errorf("the label row reads %q, want %q: a hole in the row means a cell lost its background", row, want)
+	}
+}
+
+// cursorCell finds the cell a window's app painted in the cursor colour.
+func cursorCell(m *Model, w *wm.Window) (int, int, bool) {
+	cursor := theme.Background(theme.NewStyles(m.styles.Theme).Theme.Cursor)
+
+	for y := w.Rect.Y; y < w.Rect.Bottom(); y++ {
+		for x := w.Rect.X; x < w.Rect.Right(); x++ {
+			if m.screen.At(x, y).Background == cursor {
+				return x, y, true
+			}
+		}
+	}
+	return 0, 0, false
 }
 
 func TestWindowTitleButtons(t *testing.T) {

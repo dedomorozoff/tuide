@@ -43,6 +43,7 @@ type Styles struct {
 	TaskbarText        lipgloss.Style
 	TaskbarItem        lipgloss.Style
 	TaskbarItemFocused lipgloss.Style
+	TaskbarWarning     lipgloss.Style
 
 	Hint      lipgloss.Style
 	Danger    lipgloss.Style
@@ -83,6 +84,9 @@ func NewStyles(t Theme) Styles {
 		TaskbarText:        lipgloss.NewStyle().Foreground(t.TextDim).Background(t.Taskbar),
 		TaskbarItem:        lipgloss.NewStyle().Foreground(t.Text).Background(t.Taskbar).Padding(0, 1),
 		TaskbarItemFocused: lipgloss.NewStyle().Foreground(t.TextStrong).Background(t.AccentDim).Padding(0, 1),
+		// The status light carries its own background: it is drawn straight
+		// onto the bar rather than inside a box that would supply one.
+		TaskbarWarning: lipgloss.NewStyle().Foreground(t.Warning).Background(t.Taskbar),
 
 		Hint:      lipgloss.NewStyle().Foreground(t.TextDim),
 		Danger:    lipgloss.NewStyle().Foreground(t.Danger),

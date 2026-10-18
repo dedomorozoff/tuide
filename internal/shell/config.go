@@ -21,6 +21,12 @@ func (m *Model) applyConfig(cfg config.Config) {
 	m.options.Taskbar = cfg.Taskbar
 	m.options.Mouse = cfg.Mouse
 	m.windows.SetWorkArea(workArea(m.width, m.height, cfg.Taskbar))
+
+	// The month view hangs off the clock: without a taskbar it has nothing to
+	// hang from.
+	if !cfg.Taskbar {
+		m.calendar = calendarState{}
+	}
 }
 
 // replyToFocused delivers a message to the focused window's app. Configuration

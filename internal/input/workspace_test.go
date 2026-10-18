@@ -1,6 +1,10 @@
 package input
 
-import "testing"
+import (
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 func TestWorkspaceActionsRoundTrip(t *testing.T) {
 	for n := 1; n <= WorkspaceKeys; n++ {
@@ -36,6 +40,63 @@ func TestWorkspaceActionsRejectGarbage(t *testing.T) {
 		if n, ok := ParseWorkspace(action); ok {
 			t.Errorf("ParseWorkspace(%q) = %d, true; want false", action, n)
 		}
+	}
+}
+
+func TestFocusWindowActionsRoundTrip(t *testing.T) {
+	for n := 1; n <= WindowKeys; n++ {
+		if got, ok := ParseFocusWindow(FocusWindowAction(n)); !ok || got != n {
+			t.Errorf("ParseFocusWindow(FocusWindowAction(%d)) = %d, %v", n, got, ok)
+		}
+	}
+}
+
+func TestFocusWindowActionsRejectGarbage(t *testing.T) {
+	cases := []Action{
+		ActionQuit,
+		ActionFocusNext,
+		"",
+		"focus-window-",
+		"focus-window-0",
+		"focus-window-10",
+		"focus-window-b",
+	}
+	for _, action := range cases {
+		if n, ok := ParseFocusWindow(action); ok {
+			t.Errorf("ParseFocusWindow(%q) = %d, true; want false", action, n)
+		}
+	}
+}
+
+func TestNumberedActionsDoNotCross(t *testing.T) {
+	if _, ok := ParseFocusWindow(WorkspaceAction(3)); ok {
+		t.Error("a workspace action must not parse as a window slot")
+	}
+	if _, ok := ParseFocusWindow(MoveToWorkspaceAction(3)); ok {
+		t.Error("a send action must not parse as a window slot")
+	}
+	if _, ok := ParseWorkspace(FocusWindowAction(3)); ok {
+		t.Error("a window slot must not parse as a workspace")
+	}
+	if _, ok := ParseMoveToWorkspace(FocusWindowAction(3)); ok {
+		t.Error("a window slot must not parse as a send action")
+	}
+}
+
+func TestWindowSlotKeysAndWorkspaceKeysStayApart(t *testing.T) {
+	keymap := DefaultKeymap()
+
+	action, ok := keymap.Lookup(press(tea.ModAlt, '3'))
+	if !ok || action != FocusWindowAction(3) {
+		t.Errorf("alt+3 = %q, %v, want %q", action, ok, FocusWindowAction(3))
+	}
+	action, ok = keymap.Lookup(press(tea.ModCtrl|tea.ModAlt, '3'))
+	if !ok || action != WorkspaceAction(3) {
+		t.Errorf("ctrl+alt+3 = %q, %v, want %q", action, ok, WorkspaceAction(3))
+	}
+	action, ok = keymap.Lookup(press(tea.ModCtrl|tea.ModAlt|tea.ModShift, '3'))
+	if !ok || action != MoveToWorkspaceAction(3) {
+		t.Errorf("ctrl+alt+shift+3 = %q, %v, want %q", action, ok, MoveToWorkspaceAction(3))
 	}
 }
 

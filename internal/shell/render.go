@@ -12,10 +12,48 @@ import (
 	"github.com/dedomorozoff/tuide/internal/wm"
 )
 
-// startLabel is the taskbar's menu button; clicking it opens the launcher. The
-// label is plain text on purpose: box-drawing and letters have one width on
-// every terminal, while icon-like glyphs may be counted as two cells.
-const startLabel = "start"
+// startPaneLit and startPaneShadow are the two halves of the mark the menu
+// button falls back to when no label is configured: half blocks, so the mark
+// reads as two panes with a gutter between them — the desktop this window
+// manager builds, in two cells. Half blocks belong to the East Asian ambiguous
+// width class, so a terminal that counts ambiguous glyphs as two cells may draw
+// the mark wider than we measure it; box drawing would be safer, but nothing in
+// that block reads as a pane.
+const (
+	startPaneLit    = "▌"
+	startPaneShadow = "▐"
+)
+
+// startLabelMax is how many cells a configured label may take on the bar. The
+// config already holds a label to StartLabelMax runes, and this is the second
+// guard: a label of wide graphemes is wider than it is long, and the bar has to
+// keep its window buttons.
+const startLabelMax = 12
+
+// startButton renders the taskbar's menu button. It is a chip in the accent
+// colour rather than more text on the bar, so it reads as the one button that
+// is not a window. The chip carries the configured label, or the built-in mark
+// when the config has none, and lights up while the launcher is open.
+//
+// Every cell is styled on its own, the padding included: a styled string nested
+// inside another one loses its background where the inner reset lands, and on a
+// taskbar that shows up as a hole in the bar.
+func (m *Model) startButton() string {
+	background := m.styles.Theme.Accent
+	if m.launcher.open {
+		background = m.styles.Theme.TextStrong
+	}
+	chip := lipgloss.NewStyle().Background(background)
+	ink := lipgloss.NewStyle().Foreground(m.styles.Theme.Background).Background(background)
+	shadow := lipgloss.NewStyle().Foreground(m.styles.Theme.AccentDim).Background(background)
+
+	face := ink.Render(startPaneLit) + shadow.Render(startPaneShadow)
+	if label := truncate(m.cfg.StartLabel, startLabelMax); label != "" {
+		face = ink.Render(label)
+	}
+
+	return chip.Render(" ") + face + chip.Render(" ")
+}
 
 func (m *Model) drawWindow(w *wm.Window, focused bool) {
 	m.screen.Fill(w.Rect, theme.Background(m.styles.Theme.Background))
@@ -72,11 +110,7 @@ type taskbarItem struct {
 func (m *Model) taskbarItems() []taskbarItem {
 	y := max(0, m.height-TaskbarHeight)
 
-	startStyle := m.styles.TaskbarItem
-	if m.launcher.open {
-		startStyle = m.styles.TaskbarItemFocused
-	}
-	start := startStyle.Render(startLabel)
+	start := m.startButton()
 
 	items := []taskbarItem{{
 		id:    "start",
@@ -124,16 +158,14 @@ func (m *Model) taskbarItems() []taskbarItem {
 	return items
 }
 
+// statusIndicators renders the bar's status light. The network light is silent
+// while the network is fine: a light that is always on says nothing, and the
+// desktop only lights it up once a probe has actually failed.
 func (m *Model) statusIndicators() string {
-	var parts []string
-	if m.netOnline {
-		parts = append(parts, "online")
-	}
-	if len(parts) == 0 {
+	if m.net != netOffline {
 		return ""
 	}
-	text := " " + strings.Join(parts, " ") + " "
-	return m.styles.TaskbarText.Render(text)
+	return m.styles.TaskbarWarning.Render(" offline ")
 }
 
 // taskbarWindows lists windows in the order they were opened, so buttons keep
@@ -144,15 +176,38 @@ func (m *Model) taskbarWindows() []*wm.Window {
 	return windows
 }
 
+// windowSlots numbers the windows the way alt+1..9 and the taskbar buttons see
+// them: one slot per window of the active workspace, counted in the order the
+// windows were opened — the minimized ones still hold their number, they are
+// listed on the bar all the same. The number must not depend on the stacking
+// order or on how many buttons happen to fit on a narrow bar, or the same key
+// would mean a different window from one frame to the next.
+func (m *Model) windowSlots() map[string]int {
+	windows := m.taskbarWindows()
+	slots := make(map[string]int, len(windows))
+	for i, w := range windows {
+		slots[w.ID] = i + 1
+	}
+	return slots
+}
+
 // clockText renders the taskbar clock from the last tick.
 func (m *Model) clockText() string {
 	return " " + m.now.Format("15:04") + " "
 }
 
 // startRect is where the start button sits.
-func (m *Model) startRect() geom.Rect {
+func (m *Model) startRect() geom.Rect { return m.taskbarRect("start") }
+
+// clockRect is where the taskbar clock sits.
+func (m *Model) clockRect() geom.Rect { return m.taskbarRect("clock") }
+
+// taskbarRect is where the element with this id sits, empty when the bar does
+// not show it. Hit-testing and hit-testing's callers ask here rather than
+// walking the item list themselves.
+func (m *Model) taskbarRect(id string) geom.Rect {
 	for _, item := range m.taskbarItems() {
-		if item.id == "start" {
+		if item.id == id {
 			return item.rect
 		}
 	}

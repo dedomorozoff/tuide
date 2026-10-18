@@ -305,6 +305,19 @@ func (v *VT) resizeBuffer(b *Buffer) {
 	b.bottom = height - 1
 }
 
+// Row returns the styled cells of the visible row y, or nil when the row is
+// off screen. It is what the session server needs to redraw a screen for a
+// client that has just attached.
+func (v *VT) Row(y int) []Cell {
+	row := v.visibleRow(y)
+	if row == nil {
+		return nil
+	}
+	out := make([]Cell, len(row))
+	copy(out, row)
+	return out
+}
+
 // Line returns the visible text of a screen row.
 func (v *VT) Line(y int) string {
 	if y < 0 || y >= v.height {

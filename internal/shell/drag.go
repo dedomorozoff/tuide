@@ -78,6 +78,10 @@ func (m *Model) onClick(msg tea.MouseClickMsg) tea.Cmd {
 		return m.onLauncherClick(mouse)
 	}
 
+	if m.calendar.open {
+		return m.onCalendarClick()
+	}
+
 	// The taskbar answers the middle button as well, so it is consulted before
 	// the check that sends every other button to the focused app.
 	if m.options.Taskbar {
@@ -301,16 +305,11 @@ func (m *Model) taskbarItemClick(id string, button tea.MouseButton) tea.Cmd {
 	switch {
 	case id == "start":
 		m.openLauncher(launcherApps)
-	case id == "clock" || id == "status":
+	case id == "clock":
+		m.toggleCalendar()
+	case id == "status":
 	default:
-		if w == nil {
-			return nil
-		}
-		if w == m.windows.Focused() && w.State != wm.Minimized {
-			m.toggleMinimized(w.ID)
-			return nil
-		}
-		m.focus(w.ID)
+		m.activateWindow(id)
 	}
 	return nil
 }

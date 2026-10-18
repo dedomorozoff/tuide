@@ -1,9 +1,11 @@
 package shell
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dedomorozoff/tuide/internal/appsdk"
 	"github.com/dedomorozoff/tuide/internal/theme"
@@ -489,6 +491,103 @@ func TestTabHUDTracksAltTabAndClearsOnNextKey(t *testing.T) {
 	press(t, m, tea.Key{Code: 'x'})
 	if m.tabbing {
 		t.Error("the next key should dismiss the window list")
+	}
+}
+
+// TestTabHUDNumbersWindowsLikeTheTaskbar pins the numbers a user reads in the
+// alt-tab list to the numbers alt+1..9 take: the slot is fixed when the window
+// opens, so minimizing a window must not renumber the ones after it.
+func TestTabHUDNumbersWindowsLikeTheTaskbar(t *testing.T) {
+	m := newMultiDesktop("a", "b", "c")
+	_ = m.Init()
+
+	windows := m.taskbarWindows()
+	m.toggleMinimized(windows[1].ID)
+	m.tabbing = true
+
+	frame := ansi.Strip(m.View().Content)
+	if strings.Contains(frame, "2  b") {
+		t.Errorf("a minimized window must not be listed:\n%s", frame)
+	}
+	if !strings.Contains(frame, "1  a") || !strings.Contains(frame, "3  c") {
+		t.Errorf("the HUD should keep the taskbar slots:\n%s", frame)
+	}
+}
+
+func TestWindowSlotKeyActivatesAndMinimizes(t *testing.T) {
+	m := newMultiDesktop("a", "b")
+	_ = m.Init()
+
+	windows := m.taskbarWindows()
+	first, second := windows[0], windows[1]
+	m.focus(second.ID)
+
+	press(t, m, tea.Key{Code: '1', Mod: tea.ModAlt})
+	if m.windows.Focused() != first {
+		t.Fatalf("alt+1 focused %v, want the first window", m.windows.Focused())
+	}
+
+	press(t, m, tea.Key{Code: '1', Mod: tea.ModAlt})
+	if first.State != wm.Minimized {
+		t.Error("alt+1 on the focused window should minimize it")
+	}
+}
+
+func TestWindowSlotKeyRevealsMinimizedWindow(t *testing.T) {
+	m := newMultiDesktop("a", "b")
+	_ = m.Init()
+
+	first := m.taskbarWindows()[0]
+	m.toggleMinimized(first.ID)
+
+	press(t, m, tea.Key{Code: '1', Mod: tea.ModAlt})
+	if m.windows.Focused() != first {
+		t.Errorf("focus = %v, want the minimized window", m.windows.Focused())
+	}
+	if first.State == wm.Minimized {
+		t.Error("the window behind the slot should come back up")
+	}
+}
+
+func TestWindowSlotKeyCountsWithinTheWorkspace(t *testing.T) {
+	m := newMultiDesktop("a", "b")
+	_ = m.Init()
+
+	second := m.taskbarWindows()[1]
+	if err := m.windows.MoveToWorkspace(second.ID, 1); err != nil {
+		t.Fatalf("move to workspace: %v", err)
+	}
+	if err := m.windows.SetWorkspace(0); err != nil {
+		t.Fatalf("switch workspace: %v", err)
+	}
+
+	focused := m.windows.Focused()
+	press(t, m, tea.Key{Code: '2', Mod: tea.ModAlt})
+	if m.windows.Focused() != focused {
+		t.Error("the other workspace's window must not answer for a slot on this one")
+	}
+
+	// The window that left is slot 1 of its own workspace, and alt+1 brings it
+	// back from there.
+	if err := m.windows.SetWorkspace(1); err != nil {
+		t.Fatalf("switch workspace: %v", err)
+	}
+	m.toggleMinimized(second.ID)
+
+	press(t, m, tea.Key{Code: '1', Mod: tea.ModAlt})
+	if m.windows.Focused() != second {
+		t.Errorf("focus = %v, want the only window of this workspace", m.windows.Focused())
+	}
+}
+
+func TestWindowSlotKeyIgnoresEmptySlots(t *testing.T) {
+	m := newMultiDesktop("a")
+	_ = m.Init()
+
+	focused := m.windows.Focused()
+	press(t, m, tea.Key{Code: '7', Mod: tea.ModAlt})
+	if m.windows.Focused() != focused {
+		t.Error("a slot with no window behind it should do nothing")
 	}
 }
 

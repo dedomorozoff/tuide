@@ -216,8 +216,9 @@ func TestControlChordsReachTheFocusedApp(t *testing.T) {
 	m := desktopWith(t, "probe", specFor("probe", func() appsdk.App { return &frameApp{} }))
 	_ = m.Init()
 
-	// Ctrl alone is never a desktop shortcut any more: the shell has to let
+	// Ctrl alone is almost never a desktop shortcut: the shell has to let
 	// these through so a terminal inside can receive ctrl+c and ctrl+w.
+	// ctrl+p is the one exception, bound to the launcher on purpose.
 	for _, code := range []rune{'c', 'w', 'q'} {
 		if _, ok := m.keymap.Lookup(tea.KeyPressMsg(tea.Key{Code: code, Mod: tea.ModCtrl})); ok {
 			t.Errorf("ctrl+%c should not be a desktop shortcut", code)

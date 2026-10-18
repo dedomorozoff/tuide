@@ -69,6 +69,20 @@ func TestBindOverridesDefaults(t *testing.T) {
 	}
 }
 
+func TestDefaultsOpenLauncherOnCtrlPAndKeepCtrlAltPSeparate(t *testing.T) {
+	keymap := DefaultKeymap()
+
+	action, ok := keymap.Lookup(press(tea.ModCtrl, 'p'))
+	if !ok || action != ActionOpenLauncher {
+		t.Errorf("ctrl+p = %q, %v, want %q", action, ok, ActionOpenLauncher)
+	}
+
+	action, ok = keymap.Lookup(press(tea.ModCtrl|tea.ModAlt, 'p'))
+	if !ok || action != ActionFocusLast {
+		t.Errorf("ctrl+alt+p = %q, %v, want %q", action, ok, ActionFocusLast)
+	}
+}
+
 func TestDefaultsAreUnique(t *testing.T) {
 	seen := make(map[Binding]Action)
 	for _, mapping := range Defaults() {

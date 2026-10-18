@@ -13,6 +13,7 @@ import (
 	"github.com/dedomorozoff/tuide/internal/config"
 	"github.com/dedomorozoff/tuide/internal/geom"
 	"github.com/dedomorozoff/tuide/internal/input"
+	"github.com/dedomorozoff/tuide/internal/session"
 	"github.com/dedomorozoff/tuide/internal/sys"
 	"github.com/dedomorozoff/tuide/internal/theme"
 	"github.com/dedomorozoff/tuide/internal/wm"
@@ -35,6 +36,15 @@ type Options struct {
 	Taskbar bool
 	Mouse   bool
 	Launch  []string
+	// StartLabel is the text on the taskbar's menu button. Empty falls back to
+	// the built-in mark.
+	StartLabel string
+	// Restore, when set, rebuilds the desktop from a saved session on the
+	// first resize instead of opening the launch list.
+	Restore *session.Snapshot
+	// Persist makes the desktop write its session file while it runs. Servers
+	// turn it on; a local run keeps its hands off the shared session.
+	Persist bool
 }
 
 // Model is the root model. Applications live inside windows and only ever see
@@ -67,15 +77,21 @@ type Model struct {
 	tabbing bool
 	// launcher is the app launcher / action palette overlay.
 	launcher launcherState
+	// calendar is the clock's popup month view.
+	calendar calendarState
 	// now is the time the last tick reported; the taskbar clock reads it.
 	now time.Time
 	// frameSizes remembers the content size each app was last told about, so
 	// only real resizes produce a message.
 	frameSizes map[string][2]int
-	// netOnline is the cached internet connectivity status.
-	netOnline bool
+	// net is the last thing the connectivity probe reported.
+	net netState
 	// netTick counts ticks to throttle connectivity probes.
 	netTick int
+	// ticks counts clock ticks to throttle session saves.
+	ticks int
+	// restore is the saved session waiting for the first resize, if any.
+	restore *session.Snapshot
 }
 
 // New builds the desktop from a palette, a set of launchable apps and options.
@@ -91,10 +107,11 @@ func New(palette theme.Theme, specs []appsdk.Spec, options Options) *Model {
 		snapLast: make(map[string]wm.Zone),
 		options:  options,
 		cfg: config.Config{
-			Theme:   palette.Name,
-			Startup: options.Launch,
-			Taskbar: options.Taskbar,
-			Mouse:   options.Mouse,
+			Theme:      palette.Name,
+			Startup:    options.Launch,
+			Taskbar:    options.Taskbar,
+			Mouse:      options.Mouse,
+			StartLabel: options.StartLabel,
 		},
 		width:  width,
 		height: height,
@@ -113,6 +130,7 @@ func New(palette theme.Theme, specs []appsdk.Spec, options Options) *Model {
 	m.keymap = input.DefaultKeymap()
 	m.windows = wm.New(workArea(width, height, options.Taskbar))
 	m.screen = compositor.New(width, height)
+	m.restore = options.Restore
 	return m
 }
 
@@ -127,6 +145,11 @@ func (m *Model) WithKeymap(keymap *input.Keymap) *Model {
 // (ctrl+alt+space) starts apps on demand.
 func (m *Model) Init() tea.Cmd {
 	ids := m.options.Launch
+	if m.restore != nil && !m.restore.Empty() {
+		// The saved session replaces the startup list: a restored desktop is
+		// the one the user left behind.
+		ids = nil
+	}
 
 	cmds := make([]tea.Cmd, 0, len(ids)+1)
 	for _, id := range ids {
@@ -152,19 +175,39 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		return m, m.resize(msg.Width, msg.Height)
+		cmd := m.resize(msg.Width, msg.Height)
+		if m.restore != nil {
+			// The work area is real only now, so the session is rebuilt here
+			// and never again.
+			cmd = tea.Batch(cmd, m.restoreWindows(*m.restore))
+			m.restore = nil
+		}
+		return m, cmd
 
 	case tickMsg:
 		m.now = time.Time(msg)
 		m.netTick++
+		m.ticks++
 		cmds := []tea.Cmd{tickCmd(), m.windows.Broadcast(appsdk.Tick{Time: m.now})}
 		if m.netTick%30 == 0 {
 			cmds = append(cmds, probeNetCmd)
 		}
+		if m.options.Persist && m.ticks%saveEveryTicks == 0 {
+			cmds = append(cmds, saveSessionCmd(m.Snapshot()))
+		}
 		return m, tea.Batch(cmds...)
 
+	case sessionSavedMsg:
+		if msg.err != nil {
+			m.lastErr = msg.err
+		}
+		return m, nil
+
 	case netMsg:
-		m.netOnline = bool(msg)
+		m.net = netOffline
+		if msg {
+			m.net = netOnline
+		}
 		return m, nil
 
 	case appsdk.RequestConfig:
@@ -261,6 +304,9 @@ func (m *Model) View() tea.View {
 	if m.inspector {
 		m.drawInspector()
 	}
+	if m.calendar.open {
+		m.drawCalendar()
+	}
 	if m.launcher.open {
 		m.drawLauncher()
 	}
@@ -279,6 +325,17 @@ func (m *Model) Err() error { return m.lastErr }
 
 // tickMsg carries the wall clock into the model once a second.
 type tickMsg time.Time
+
+// netState is what the connectivity probe knows. It starts out unknown, so the
+// bar stays quiet until a probe has actually failed: a warning light that is on
+// before the first probe came back would be telling a story it does not know.
+type netState int
+
+const (
+	netUnknown netState = iota
+	netOnline
+	netOffline
+)
 
 // netMsg carries connectivity status.
 type netMsg bool
@@ -303,6 +360,14 @@ func (m *Model) resize(width, height int) tea.Cmd {
 func (m *Model) onKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	if m.launcher.open {
 		return m.launcherKey(msg)
+	}
+	if m.calendar.open {
+		if m.calendarKey(msg.Key()) {
+			return nil
+		}
+		// The key was not the calendar's: the popup steps aside and the key
+		// goes on to the desktop, so a stray press never leaves it hanging.
+		m.calendar = calendarState{}
 	}
 	action, ok := m.keymap.Lookup(msg)
 	if !ok || (action != input.ActionFocusNext && action != input.ActionFocusPrev) {
@@ -374,6 +439,9 @@ func (m *Model) perform(action input.Action) tea.Cmd {
 	case input.ActionToggleInspector:
 		m.inspector = !m.inspector
 		return nil
+	case input.ActionToggleCalendar:
+		m.toggleCalendar()
+		return nil
 	case input.ActionOpenLauncher:
 		m.tabbing = false
 		m.openLauncher(launcherApps)
@@ -392,6 +460,10 @@ func (m *Model) perform(action input.Action) tea.Cmd {
 	}
 	if index, ok := input.ParseMoveToWorkspace(action); ok {
 		m.moveToWorkspace(index - 1)
+		return nil
+	}
+	if slot, ok := input.ParseFocusWindow(action); ok {
+		m.focusWindowSlot(slot)
 		return nil
 	}
 
@@ -438,6 +510,34 @@ func (m *Model) perform(action input.Action) tea.Cmd {
 		return m.snapFocused(wm.ZoneCenter)
 	}
 	return nil
+}
+
+// focusWindowSlot activates the window holding a taskbar slot, counting from 1
+// in the order the windows were opened.
+func (m *Model) focusWindowSlot(slot int) {
+	windows := m.taskbarWindows()
+	if slot < 1 || slot > len(windows) {
+		return
+	}
+	m.activateWindow(windows[slot-1].ID)
+}
+
+// activateWindow brings a window forward the way a click on its taskbar button
+// does: the focused window folds away instead, anything else comes back up and
+// takes the focus. The pointer and alt+1..9 both go through here, so a button
+// and a number can never disagree.
+func (m *Model) activateWindow(id string) {
+	w := m.windows.Find(id)
+	if w == nil {
+		return
+	}
+	if w == m.windows.Focused() && w.State != wm.Minimized {
+		m.toggleMinimized(id)
+		return
+	}
+	if err := m.windows.Reveal(id); err != nil {
+		m.lastErr = err
+	}
 }
 
 // moveToWorkspace sends the focused window to another desktop and follows it.

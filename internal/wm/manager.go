@@ -192,6 +192,43 @@ func (m *Manager) Open(spec appsdk.Spec) (*Window, error) {
 	return w, nil
 }
 
+// OpenRestored places a window with a saved geometry and workspace, the way a
+// saved session is rebuilt. Unlike Open it takes the geometry as given instead
+// of cascading a fresh one.
+func (m *Manager) OpenRestored(spec appsdk.Spec, rect geom.Rect, workspace int, state State) (*Window, error) {
+	if err := spec.Validate(); err != nil {
+		return nil, fmt.Errorf("wm: restore %s: %w", spec.ID, err)
+	}
+	if m.Find(spec.ID) != nil {
+		return nil, fmt.Errorf("wm: restore %s: %w", spec.ID, errors.New("window already open"))
+	}
+	if workspace < 0 || workspace >= Workspaces {
+		workspace = m.active
+	}
+
+	m.step++
+
+	w := &Window{
+		ID:        spec.ID,
+		Spec:      spec,
+		App:       spec.Launch(),
+		State:     state,
+		Workspace: workspace,
+		Opened:    m.step,
+	}
+	w.Rect = m.clampToWork(w, rect)
+	w.Restore = w.Rect
+	w.Floating = w.Rect
+	if state == Maximized {
+		w.Rect = m.workArea
+	}
+
+	m.windows = append(m.windows, w)
+	m.focusedID = w.ID
+	m.arrange()
+	return w, nil
+}
+
 // Focus makes a window the top of the stack and the target of key input.
 func (m *Manager) Focus(id string) error {
 	w := m.Find(id)

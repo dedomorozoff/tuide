@@ -56,6 +56,7 @@ func shellActions() []actionEntry {
 		{"Snap center", input.ActionSnapCenter},
 		{"Toggle layout", input.ActionToggleLayout},
 		{"Toggle inspector", input.ActionToggleInspector},
+		{"Calendar", input.ActionToggleCalendar},
 	}
 	for n := 1; n <= input.WorkspaceKeys; n++ {
 		entries = append(entries, actionEntry{

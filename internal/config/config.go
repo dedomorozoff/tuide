@@ -14,12 +14,18 @@ import (
 // FileName is the config file inside the config directory.
 const FileName = "config.json"
 
+// StartLabelMax is how many runes the taskbar menu label may hold. The limit
+// keeps a hand-edited config from pushing the window buttons off the bar, and
+// it is what the settings window enforces while the label is typed.
+const StartLabelMax = 12
+
 // Config is everything the user can change without recompiling.
 type Config struct {
-	Theme   string   `json:"theme"`
-	Startup []string `json:"startup"`
-	Taskbar bool     `json:"taskbar"`
-	Mouse   bool     `json:"mouse"`
+	Theme      string   `json:"theme"`
+	Startup    []string `json:"startup"`
+	Taskbar    bool     `json:"taskbar"`
+	Mouse      bool     `json:"mouse"`
+	StartLabel string   `json:"startLabel"`
 }
 
 // Default returns the configuration used when no file exists.

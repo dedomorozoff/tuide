@@ -15,14 +15,13 @@ import (
 // readable.
 func (m *Model) drawTabHUD() {
 	focused := m.windows.Focused()
+	slots := m.windowSlots()
 
 	lines := make([]string, 0, m.windows.Count())
-	index := 0
 	for _, w := range m.windows.Windows() {
 		if w.State == wm.Minimized {
 			continue
 		}
-		index++
 
 		mark := "  "
 		style := m.styles.Panel
@@ -30,7 +29,7 @@ func (m *Model) drawTabHUD() {
 			mark = "> "
 			style = m.styles.Selection
 		}
-		lines = append(lines, style.Render(fmt.Sprintf("%s%d  %s", mark, index, w.Spec.Name)))
+		lines = append(lines, style.Render(fmt.Sprintf("%s%d  %s", mark, slots[w.ID], w.Spec.Name)))
 	}
 	if len(lines) == 0 {
 		return
