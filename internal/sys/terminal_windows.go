@@ -12,7 +12,31 @@ import (
 // TerminalSize reports the size of the console behind f in cells.
 func TerminalSize(f *os.File) (int, int, error) {
 	var info windows.ConsoleScreenBufferInfo
-	if err := windows.GetConsoleScreenBufferInfo(windows.Handle(f.Fd()), &info); err != nil {
+	handle := windows.Handle(f.Fd())
+	if err := windows.GetConsoleScreenBufferInfo(handle, &info); err != nil {
+		stdout, stdErr := windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
+		if stdErr == nil && stdout != 0 && stdout != windows.InvalidHandle && windows.GetConsoleScreenBufferInfo(stdout, &info) == nil {
+			width := int(info.Window.Right - info.Window.Left + 1)
+			height := int(info.Window.Bottom - info.Window.Top + 1)
+			return width, height, nil
+		}
+		conout, conErr := windows.CreateFile(
+			windows.StringToUTF16Ptr("CONOUT$"),
+			windows.GENERIC_READ|windows.GENERIC_WRITE,
+			windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
+			nil,
+			windows.OPEN_EXISTING,
+			0,
+			0,
+		)
+		if conErr == nil {
+			defer windows.CloseHandle(conout)
+			if windows.GetConsoleScreenBufferInfo(conout, &info) == nil {
+				width := int(info.Window.Right - info.Window.Left + 1)
+				height := int(info.Window.Bottom - info.Window.Top + 1)
+				return width, height, nil
+			}
+		}
 		return 0, 0, fmt.Errorf("sys: terminal size: %w", err)
 	}
 	width := int(info.Window.Right - info.Window.Left + 1)

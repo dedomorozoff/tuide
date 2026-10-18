@@ -72,7 +72,7 @@ func Attach(addr, token string) error {
 		_ = sys.ResetTerminal(os.Stdout)
 	}()
 
-	width, height, err := sys.TerminalSize(os.Stdin)
+	width, height, err := sys.TerminalSize(os.Stdout)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func Attach(addr, token string) error {
 	var wmu sync.Mutex
 	errc := make(chan error, 2)
 	go forwardInput(conn, &wmu, errc)
-	go watchResize(conn, &wmu, os.Stdin, errc)
+	go watchResize(conn, &wmu, os.Stdout, errc)
 
 	for {
 		kind, payload, err := wire.Read(conn)

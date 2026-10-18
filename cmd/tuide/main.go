@@ -196,6 +196,9 @@ func runServe() error {
 	logw := serverLog()
 	srv := server.New(model, logw)
 	runErr := srv.Run()
+	if runErr != nil {
+		fmt.Fprintln(logw, "tuide: server run:", runErr)
+	}
 
 	if err := session.Save(srv.Model().Snapshot()); err != nil {
 		fmt.Fprintln(logw, "tuide: save session:", err)
