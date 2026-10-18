@@ -3,6 +3,7 @@
 package sys
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"sort"
@@ -31,8 +32,14 @@ const (
 const ptyTransportVar = "TUIDE_PTY"
 
 // conptyProbeTimeout is how long the transport probe waits for its throwaway
-// child.
+// child to prove the pseudoconsole passes bytes through.
 const conptyProbeTimeout = 3 * time.Second
+
+// conptyProbeMarker is the text the probe child echoes back on a working
+// pseudoconsole. Its output, not its exit code, is the signal: a host where the
+// pseudoconsole exists but swallows everything lets the child finish cleanly,
+// and only real output tells the transports apart.
+const conptyProbeMarker = "conpty-probe-ok"
 
 // conptyUsable is decided once per process: a machine where the pseudoconsole
 // works must not pay for the probe on every terminal window, and a machine
@@ -54,10 +61,11 @@ func resolveConPTY(override string) bool {
 	return probeConPTY()
 }
 
-// probeConPTY starts a child on a pseudoconsole and watches it finish. Hosts
-// where the pseudoconsole cannot host a session kill the child at DLL init and
-// the terminal would stay empty forever, so the child exiting cleanly is the
-// signal that the real transport will work.
+// probeConPTY starts a child on a pseudoconsole and waits for its echo. Hosts
+// where the pseudoconsole cannot host a session kill the child at DLL init, and
+// hosts where it cannot pass bytes through let the child finish in silence; in
+// both cases the real transport has to fall back, so the probe only believes
+// the pseudoconsole after it carried the marker back.
 func probeConPTY() bool {
 	shell := os.Getenv("COMSPEC")
 	if shell == "" {
@@ -65,7 +73,7 @@ func probeConPTY() bool {
 	}
 
 	terminal, err := startConPTY(PTYOptions{
-		Command: []string{shell, "/c", "exit", "0"},
+		Command: []string{shell, "/d", "/c", "echo " + conptyProbeMarker},
 		Width:   80,
 		Height:  24,
 	})
@@ -78,7 +86,42 @@ func probeConPTY() bool {
 	if !ok {
 		return true
 	}
-	return client.exitCode(conptyProbeTimeout) == 0
+
+	var output bytes.Buffer
+	var lock sync.Mutex
+	echo := make(chan byte, 1)
+	go func() {
+		buffer := make([]byte, 4096)
+		for {
+			n, err := client.Read(buffer)
+			lock.Lock()
+			output.Write(buffer[:n])
+			if containsMarker(output.String()) {
+				lock.Unlock()
+				echo <- 1
+				return
+			}
+			lock.Unlock()
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	deadline := time.After(conptyProbeTimeout)
+	for {
+		select {
+		case <-echo:
+			return true
+		case <-deadline:
+			return false
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+}
+
+func containsMarker(text string) bool {
+	return strings.Contains(text, conptyProbeMarker)
 }
 
 // windowsPTY is a ConPTY session: a pseudoconsole handle with the pipes that
