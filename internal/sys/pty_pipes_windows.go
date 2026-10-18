@@ -22,6 +22,8 @@ type pipesPTY struct {
 	process windows.Handle
 	thread  windows.Handle
 
+	decoder *legacyDecoder
+
 	mu     sync.Mutex
 	alive  bool
 	closed bool
@@ -62,7 +64,7 @@ func startPipesPTY(options PTYOptions) (PTY, error) {
 	info := new(windows.ProcessInformation)
 	if err := windows.CreateProcess(
 		executable, line, nil, nil, true,
-		windows.CREATE_UNICODE_ENVIRONMENT|windows.CREATE_DEFAULT_ERROR_MODE,
+		windows.CREATE_UNICODE_ENVIRONMENT|windows.CREATE_DEFAULT_ERROR_MODE|windows.CREATE_NO_WINDOW,
 		environment, workingDir, startup, info,
 	); err != nil {
 		_ = windows.CloseHandle(input)
@@ -82,6 +84,7 @@ func startPipesPTY(options PTYOptions) (PTY, error) {
 		output:  os.NewFile(uintptr(output), "tuide-pty-stdout"),
 		process: info.Process,
 		thread:  info.Thread,
+		decoder: newLegacyDecoder(),
 		alive:   true,
 	}
 	go terminal.wait()
@@ -95,7 +98,30 @@ func (p *pipesPTY) wait() {
 	p.mu.Unlock()
 }
 
-func (p *pipesPTY) Read(b []byte) (int, error) { return p.output.Read(b) }
+func (p *pipesPTY) Read(b []byte) (int, error) {
+	n, err := p.output.Read(b)
+	if n > 0 {
+		if decoded := p.decoder.adapt(b[:n]); len(decoded) <= cap(b) {
+			copy(b, decoded)
+			n = len(decoded)
+		} else {
+			// The decoded text is wider than the caller's buffer. Emit what
+			// fits and hold the rest for the next read; the shell reads in
+			// multi-kilobyte chunks, so this stays rare.
+			overflow := append([]byte{}, decoded[len(b):]...)
+			copy(b, decoded[:len(b)])
+			n = len(b)
+			p.decoder.pending = append(overflow, p.decoder.pending...)
+		}
+	}
+	if err != nil {
+		if tail := p.decoder.flushForClose(); len(tail) <= cap(b)-n {
+			n += copy(b[n:], tail)
+		}
+		return n, err
+	}
+	return n, nil
+}
 
 func (p *pipesPTY) Write(b []byte) (int, error) { return p.input.Write(b) }
 

@@ -27,7 +27,7 @@ func main() {
 		for {
 			n, err := terminal.Read(buffer)
 			if n > 0 {
-				fmt.Printf("READ %d: %q\n", n, string(buffer[:n]))
+				fmt.Printf("READ %d: % x\n", n, buffer[:n])
 			}
 			if err != nil {
 				fmt.Println("read error:", err)

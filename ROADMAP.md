@@ -3,7 +3,8 @@
 Цель: окружение рабочего стола внутри терминала — окна, тайлинг, лаунчер,
 панель задач, терминал с настоящим PTY, файловый менеджер.
 
-Стек: Go 1.26, `charm.land/bubbletea/v2`, `charm.land/lipgloss/v2`, PTY (Unix pty / Windows ConPTY).
+Стек: Go 1.26, `charm.land/bubbletea/v2`, `charm.land/lipgloss/v2`, PTY (Unix pty / Windows ConPTY),
+`golang.org/x/text` для кодировок legacy-потока (pipes-транспорт пишет в OEM-кодировке, не UTF-8).
 Дистрибуция: один статический бинарь без рантайм-зависимостей.
 
 ## Решения, принятые на старте
