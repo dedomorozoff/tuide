@@ -111,6 +111,15 @@ func (b Binding) Matches(key tea.Key) bool {
 	return normalizeMods(key.Mod) == normalizeMods(b.Mods) && key.Code == b.Key
 }
 
+// normalizeMods folds the modifiers that mean the same thing into one. A
+// terminal that reports the alt key as the meta key sends the same chord in
+// a different guise, and on the keyboards we support they are the same
+// physical key.
 func normalizeMods(mods tea.KeyMod) tea.KeyMod {
-	return mods &^ (tea.ModCapsLock | tea.ModNumLock | tea.ModScrollLock)
+	mods &^= tea.ModCapsLock | tea.ModNumLock | tea.ModScrollLock
+	if mods&tea.ModMeta != 0 {
+		mods &^= tea.ModMeta
+		mods |= tea.ModAlt
+	}
+	return mods
 }

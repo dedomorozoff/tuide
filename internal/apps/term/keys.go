@@ -23,6 +23,13 @@ const ignoredMods = tea.ModCapsLock | tea.ModNumLock | tea.ModScrollLock
 // things depending on what the running program asked for.
 func encodeKey(key tea.Key, modes vt.Modes) []byte {
 	mod := key.Mod &^ ignoredMods
+
+	// A terminal that reports the alt key as the meta key sends the same key
+	// in a different guise, and the child expects the alt form of it.
+	if mod&tea.ModMeta != 0 {
+		mod &^= tea.ModMeta
+		mod |= tea.ModAlt
+	}
 	param := modParam(mod)
 
 	// Alt is the escape prefix for printable keys; the keys below that have a
