@@ -96,6 +96,17 @@ func run(args []string) error {
 	}
 }
 
+// attach joins a running session. Pressing the detach key is the normal way
+// to leave, so it ends the command quietly instead of failing the run.
+func attach(state *wire.State) error {
+	err := client.Attach(state.Addr, state.Token)
+	if errors.Is(err, client.ErrDetached) {
+		fmt.Fprintln(os.Stderr, "tuiDE: detached; the session keeps running, \"tuide attach\" brings it back")
+		return nil
+	}
+	return err
+}
+
 // runSession is the default: attach to the running session, or start a server
 // in the background and attach to the new one.
 func runSession(opts *flags) error {
@@ -104,7 +115,7 @@ func runSession(opts *flags) error {
 			if opts.detach {
 				return nil
 			}
-			return client.Attach(state.Addr, state.Token)
+			return attach(state)
 		}
 	}
 	if err := sys.StartBackground(serverArgs()); err != nil {
@@ -138,7 +149,7 @@ func waitAndAttach() error {
 		if _, err := client.List(state.Addr, state.Token); err != nil {
 			continue
 		}
-		return client.Attach(state.Addr, state.Token)
+		return attach(state)
 	}
 	return errors.New("the session did not start")
 }
@@ -154,7 +165,7 @@ func runCommand(name string) error {
 	}
 	switch name {
 	case "attach":
-		return client.Attach(state.Addr, state.Token)
+		return attach(state)
 	case "ls":
 		info, err := client.List(state.Addr, state.Token)
 		if err != nil {
