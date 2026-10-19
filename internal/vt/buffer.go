@@ -177,6 +177,7 @@ func (v *VT) originTo(row int) int {
 
 // putRune prints one rune, honouring insert mode, wrapping and combining marks.
 func (v *VT) putRune(r rune) {
+	r = v.charsetRune(r)
 	width := runeWidth(r)
 	if width == 0 {
 		v.appendToLast(r)

@@ -30,9 +30,10 @@ func (v *VT) executeControl(b byte) {
 		v.lineFeed()
 	case 0x0d:
 		v.carriageReturn()
-	case 0x0e, 0x0f:
-		// Shift out and shift in only select a character set; the emulator
-		// always draws ASCII and UTF-8.
+	case 0x0e:
+		v.g1 = true
+	case 0x0f:
+		v.g1 = false
 	case 0x84:
 		v.lineFeed()
 	case 0x85:

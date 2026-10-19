@@ -122,6 +122,11 @@ type VT struct {
 	sel         Selection
 	pendingWrap bool
 
+	// charsets holds the G0 and G1 designations, and g1 tells which of them
+	// is in use: shift out picks G1, shift in picks G0 back.
+	charsets [2]byte
+	g1       bool
+
 	// lastRune is the character most recently printed, for the REP control.
 	lastRune  rune
 	lastWidth int
@@ -159,6 +164,7 @@ func New(width, height int) *VT {
 	}
 	v.active = v.normal
 	v.modes.AutoWrap = true
+	v.charsets = [2]byte{'B', 'B'}
 	v.resetSGR()
 	return v
 }

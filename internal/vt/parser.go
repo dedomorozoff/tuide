@@ -50,6 +50,10 @@ type parser struct {
 
 	osc []byte
 	dcs []byte
+
+	// stringEsc marks that an escape byte was seen inside a string: the next
+	// byte either ends the string with the ST terminator or belongs to it.
+	stringEsc bool
 }
 
 // reset puts the decoder back to ground without touching the screen, which is
@@ -63,6 +67,7 @@ func (p *parser) reset() {
 	p.utf8At, p.utf8Len = 0, 0
 	p.osc = p.osc[:0]
 	p.dcs = p.dcs[:0]
+	p.stringEsc = false
 }
 
 func (p *parser) startCSI() {
@@ -123,7 +128,11 @@ func (v *VT) parseByte(b byte) {
 	case stateEscape:
 		v.parseEscape(b)
 	case stateEscapeIntermediate:
-		if isFinal(b) {
+		// The final byte of an escape sequence runs from 0x30 to 0x7e: the
+		// character set designations end in a digit, and swallowing one
+		// would eat the control sequence that follows.
+		if b >= 0x30 && b <= 0x7e {
+			v.executeEscape(b, p.intermediate)
 			p.state = stateGround
 		}
 	case stateCSIEntry:
@@ -146,9 +155,7 @@ func (v *VT) parseByte(b byte) {
 	case stateOSCString:
 		v.parseOSC(b)
 	case stateOSCIgnore:
-		if b == 0x07 || b == 0x9c || b == 0x18 || b == 0x1a {
-			p.state = stateGround
-		}
+		v.parseOSCIgnore(b)
 	case stateDCSEntry:
 		v.parseDCS(b)
 	case stateDCSParam:
@@ -160,9 +167,7 @@ func (v *VT) parseByte(b byte) {
 	case stateDCSPassThrough:
 		v.parseDCSPayload(b)
 	case stateDCSIgnore:
-		if b == 0x9c || b == 0x07 || b == 0x18 || b == 0x1a {
-			p.state = stateGround
-		}
+		v.parseDCSIgnore(b)
 	case stateSOSPMAPString:
 		if b == 0x07 || b == 0x9c || b == 0x18 || b == 0x1a {
 			p.state = stateGround
@@ -310,9 +315,12 @@ func (v *VT) executeEscape(final byte, intermediate byte) {
 		// Locking shift, accepted and ignored.
 	case final == '\\':
 		// A stray string terminator.
-	case intermediate == '(' || intermediate == ')' || intermediate == '*' || intermediate == '+':
-		// Character set designation: only ASCII and UTF-8 are drawn, so the
-		// sets a program may select make no difference.
+	case intermediate == '(':
+		v.charsets[0] = final
+	case intermediate == ')':
+		v.charsets[1] = final
+	case intermediate == '*' || intermediate == '+':
+		// The other two sets a program may select make no difference here.
 	case intermediate == '#':
 		// Double width and height lines are not implemented.
 	}
@@ -346,16 +354,26 @@ func (v *VT) parseCSI(b byte) {
 
 func (v *VT) parseOSC(b byte) {
 	p := &v.parser
+	if p.stringEsc {
+		p.stringEsc = false
+		if b == '\\' {
+			v.executeOSC(p.osc)
+			p.osc = p.osc[:0]
+			p.state = stateGround
+			return
+		}
+		if len(p.osc) < maxStringSequence {
+			p.osc = append(p.osc, 0x1b)
+		}
+	}
 	switch {
 	case b == 0x07 || b == 0x9c:
 		v.executeOSC(p.osc)
 		p.state = stateGround
 	case b == 0x1b:
-		// ESC \ is the two byte string terminator; the payload is complete
-		// before the terminator, so run it and ignore what follows.
-		v.executeOSC(p.osc)
-		p.osc = p.osc[:0]
-		p.state = stateOSCIgnore
+		// The escape may be the start of the ST terminator, so the string is
+		// only over once the byte after it is known.
+		p.stringEsc = true
 	case b == 0x18 || b == 0x1a:
 		p.osc = p.osc[:0]
 		p.state = stateGround
@@ -363,6 +381,25 @@ func (v *VT) parseOSC(b byte) {
 		if len(p.osc) < maxStringSequence {
 			p.osc = append(p.osc, b)
 		}
+	}
+}
+
+// parseOSCIgnore drops an unsupported string without swallowing the stream
+// that follows it: an escape inside it may still be the ST terminator.
+func (v *VT) parseOSCIgnore(b byte) {
+	p := &v.parser
+	if p.stringEsc {
+		p.stringEsc = false
+		if b == '\\' {
+			p.state = stateGround
+			return
+		}
+	}
+	switch {
+	case b == 0x07 || b == 0x9c || b == 0x18 || b == 0x1a:
+		p.state = stateGround
+	case b == 0x1b:
+		p.stringEsc = true
 	}
 }
 
@@ -410,9 +447,16 @@ func (v *VT) parseDCS(b byte) {
 // and iTerm2 graphics extensions exist and neither is supported here.
 func (v *VT) parseDCSPayload(b byte) {
 	p := &v.parser
+	if p.stringEsc {
+		p.stringEsc = false
+		if b == '\\' {
+			p.state = stateGround
+			return
+		}
+	}
 	switch {
 	case b == 0x1b:
-		p.state = stateDCSIgnore
+		p.stringEsc = true
 	case b == 0x9c || b == 0x07:
 		p.state = stateGround
 	case b == 0x18 || b == 0x1a:
@@ -422,6 +466,25 @@ func (v *VT) parseDCSPayload(b byte) {
 		if len(p.dcs) < maxStringSequence {
 			p.dcs = append(p.dcs, b)
 		}
+	}
+}
+
+// parseDCSIgnore drops an unsupported device control string without taking
+// the stream that follows it with it.
+func (v *VT) parseDCSIgnore(b byte) {
+	p := &v.parser
+	if p.stringEsc {
+		p.stringEsc = false
+		if b == '\\' {
+			p.state = stateGround
+			return
+		}
+	}
+	switch {
+	case b == 0x9c || b == 0x07 || b == 0x18 || b == 0x1a:
+		p.state = stateGround
+	case b == 0x1b:
+		p.stringEsc = true
 	}
 }
 
