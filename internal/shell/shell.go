@@ -175,6 +175,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		// A headless server has no terminal of its own and starts out at
+		// 0x0 until the first client attaches. Restoring on that size would
+		// clamp every saved window into an empty work area, so the empty size
+		// is not a real resize.
+		if msg.Width <= 0 || msg.Height <= 0 {
+			return m, nil
+		}
 		cmd := m.resize(msg.Width, msg.Height)
 		if m.restore != nil {
 			// The work area is real only now, so the session is rebuilt here

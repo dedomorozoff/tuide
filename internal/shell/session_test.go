@@ -95,6 +95,34 @@ func TestRestoreKeepsWindowState(t *testing.T) {
 	}
 }
 
+func TestRestoreWaitsForRealTerminalSize(t *testing.T) {
+	rect := geom.Rect{X: 5, Y: 3, Width: 40, Height: 12}
+	snap := session.Snapshot{
+		Windows: []session.Window{
+			{ID: "alpha", App: "alpha", Rect: rect},
+		},
+	}
+	desktop := sessionDesktop(&snap)
+	_ = desktop.Init()
+
+	_, _ = desktop.Update(tea.WindowSizeMsg{Width: 0, Height: 0})
+	if desktop.windows.Find("alpha") != nil {
+		t.Fatal("the session was restored on an empty terminal size")
+	}
+	if desktop.restore == nil {
+		t.Fatal("the session was dropped instead of waiting for a real size")
+	}
+
+	_, _ = desktop.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	alpha := desktop.windows.Find("alpha")
+	if alpha == nil {
+		t.Fatal("alpha was not restored after a real resize")
+	}
+	if alpha.Rect != rect {
+		t.Errorf("alpha rect = %v, want %v", alpha.Rect, rect)
+	}
+}
+
 func TestRestoreSkipsUnknownApps(t *testing.T) {
 	snap := session.Snapshot{
 		Windows: []session.Window{
