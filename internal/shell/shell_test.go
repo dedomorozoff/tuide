@@ -39,7 +39,13 @@ func newTestDesktop(launch ...string) *Model {
 func render(t *testing.T, m *Model) string {
 	t.Helper()
 	_ = m.Init()
+	return viewFrame(m)
+}
 
+// viewFrame strips the model's current frame to plain text. It is for tests
+// that have already brought the desktop up, so rendering does not run Init a
+// second time and open the launch list twice.
+func viewFrame(m *Model) string {
 	content := ansi.Strip(m.View().Content)
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {

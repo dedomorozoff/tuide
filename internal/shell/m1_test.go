@@ -617,6 +617,108 @@ func TestTabHUDOverlayFrame(t *testing.T) {
 	assertGolden(t, "desktop-tab-hud", render(t, m))
 }
 
+// hoverPoint returns a cell on the window's left frame, clear of the corners.
+func hoverPoint(w *wm.Window) (int, int) {
+	return w.Rect.X, w.Rect.Y + w.Rect.Height/2
+}
+
+func TestHoverLightsUpTheResizeEdge(t *testing.T) {
+	m := newMultiDesktop("a")
+	_ = m.Init()
+
+	w := m.windows.Focused()
+	if w == nil {
+		t.Fatal("no window to hover")
+	}
+	x, y := hoverPoint(w)
+
+	m.Update(tea.MouseMotionMsg(tea.Mouse{X: x, Y: y}))
+
+	if m.hover.id != w.ID {
+		t.Fatalf("hover = %+v, want it to mark %q", m.hover, w.ID)
+	}
+	if !m.hover.edges.Has(wm.EdgeLeft) || m.hover.edges.Has(wm.EdgeRight) {
+		t.Errorf("hover edges = %v, want the left side only", m.hover.edges)
+	}
+
+	_ = m.View()
+	accent := theme.Background(m.styles.Theme.Accent)
+	if got := m.screen.At(x, y).Background; got != accent {
+		t.Errorf("handle background = %q, want the accent %q", got, accent)
+	}
+	if got := m.screen.At(x, y).Text; got != "↔" {
+		t.Errorf("handle glyph = %q, want the horizontal arrow", got)
+	}
+	foreground := theme.Foreground(m.styles.Theme.Accent)
+	if got := m.screen.At(x, w.Rect.Y+1).Style; !strings.Contains(got, foreground) {
+		t.Errorf("edge style = %q, want it to carry the accent foreground %q", got, foreground)
+	}
+}
+
+func TestHoverClearsAwayFromFrames(t *testing.T) {
+	m := newMultiDesktop("a")
+	_ = m.Init()
+
+	w := m.windows.Focused()
+	x, y := hoverPoint(w)
+
+	m.Update(tea.MouseMotionMsg(tea.Mouse{X: x, Y: y}))
+	if m.hover.id == "" {
+		t.Fatal("expected a hover on the frame")
+	}
+
+	m.Update(tea.MouseMotionMsg(tea.Mouse{X: w.Rect.X + 3, Y: w.Rect.Y + 3}))
+	if m.hover.id != "" {
+		t.Errorf("hover = %+v, want it cleared over the body", m.hover)
+	}
+}
+
+func TestHoverSkipsTheTitleBar(t *testing.T) {
+	m := newMultiDesktop("a")
+	_ = m.Init()
+
+	w := m.windows.Focused()
+	title := w.TitleRect()
+
+	m.Update(tea.MouseMotionMsg(tea.Mouse{X: title.X + 1, Y: title.Y}))
+	if m.hover.id != "" {
+		t.Errorf("hover = %+v, want none on the title bar", m.hover)
+	}
+}
+
+func TestHoverSkipsDesktopOwnedGeometry(t *testing.T) {
+	m := newMultiDesktop("a")
+	_ = m.Init()
+
+	w := m.windows.Focused()
+	m.toggleMaximized(w.ID)
+
+	m.Update(tea.MouseMotionMsg(tea.Mouse{X: w.Rect.X, Y: w.Rect.Y + 2}))
+	if m.hover.id != "" {
+		t.Errorf("hover = %+v, want none on a maximized window", m.hover)
+	}
+}
+
+func TestResizeHoverFrame(t *testing.T) {
+	m := newTestDesktop()
+	_ = m.Init()
+
+	w := m.windows.Focused()
+	x, y := hoverPoint(w)
+	m.Update(tea.MouseMotionMsg(tea.Mouse{X: x, Y: y}))
+
+	assertGolden(t, "desktop-resize-hover", viewFrame(m))
+}
+
+func TestDesktopReportsAllMouseMotion(t *testing.T) {
+	m := newMultiDesktop("a")
+	_ = m.Init()
+
+	if got := m.View().MouseMode; got != tea.MouseModeAllMotion {
+		t.Errorf("mouse mode = %v, want all motion so frames light up on hover", got)
+	}
+}
+
 // press sends a key press and fails the test if the shell panics on it.
 func press(t *testing.T, m *Model, key tea.Key) {
 	t.Helper()

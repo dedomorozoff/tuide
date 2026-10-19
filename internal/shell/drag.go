@@ -44,6 +44,34 @@ type dragState struct {
 	moved  bool
 }
 
+// hoverState is the resize handle under the pointer while no gesture is
+// running. It lets a frame advertise that it can be resized before the button
+// goes down, instead of only reacting once the drag has already started.
+type hoverState struct {
+	id    string
+	edges wm.Edges
+	x     int
+	y     int
+}
+
+// updateHover tracks the resize handle under the pointer. A window the desktop
+// owns - a tiled or maximized one - has no handles to offer, and an open
+// overlay sits over the windows, so neither lights anything up.
+func (m *Model) updateHover(mouse tea.Mouse) {
+	m.hover = hoverState{}
+	if !m.options.Mouse || m.launcher.open || m.calendar.open {
+		return
+	}
+	w, region, edges := m.windows.RegionAt(mouse.X, mouse.Y)
+	if w == nil || region != wm.RegionBorder || edges.Empty() {
+		return
+	}
+	if m.windows.Layout() == wm.LayoutTiled || w.State == wm.Maximized {
+		return
+	}
+	m.hover = hoverState{id: w.ID, edges: edges, x: mouse.X, y: mouse.Y}
+}
+
 // lastClick remembers one mouse click, so the next one can recognize the pair.
 type lastClick struct {
 	at time.Time
@@ -206,6 +234,7 @@ func (m *Model) unfoldWindow(w *wm.Window) {
 func (m *Model) onMotion(msg tea.MouseMotionMsg) tea.Cmd {
 	mouse := msg.Mouse()
 	if m.drag.kind == dragNone {
+		m.updateHover(mouse)
 		return m.consumeMouse(msg, mouse)
 	}
 	w := m.windows.Find(m.drag.id)

@@ -75,6 +75,71 @@ func (m *Model) drawWindow(w *wm.Window, focused bool) {
 	m.screen.BlitView(w.ContentRect(), w.App.View(w.Context(focused)))
 }
 
+// drawResizeHover lights up the resize handle under the pointer. The whole
+// hovered side takes the accent colour and the exact cell gets a filled chip
+// with the arrow for the way it resizes, so the frame says both which side is
+// grabbable and where the pointer is on it.
+func (m *Model) drawResizeHover(w *wm.Window) {
+	rect := w.Rect
+	paint := func(x, y int) {
+		text := m.screen.At(x, y).Text
+		style := m.styles.HoverHandle
+		if x == m.hover.x && y == m.hover.y {
+			text = resizeArrow(m.hover.edges)
+			style = m.styles.HoverHandleActive
+		}
+		m.screen.Blit(geom.Rect{X: x, Y: y, Width: 1, Height: 1}, style.Render(text))
+	}
+
+	if m.hover.edges.Has(wm.EdgeLeft) {
+		for y := rect.Y; y < rect.Bottom(); y++ {
+			paint(rect.X, y)
+		}
+	}
+	if m.hover.edges.Has(wm.EdgeRight) {
+		for y := rect.Y; y < rect.Bottom(); y++ {
+			paint(rect.Right()-1, y)
+		}
+	}
+	if m.hover.edges.Has(wm.EdgeTop) {
+		for x := rect.X; x < rect.Right(); x++ {
+			paint(x, rect.Y)
+		}
+	}
+	if m.hover.edges.Has(wm.EdgeBottom) {
+		for x := rect.X; x < rect.Right(); x++ {
+			paint(x, rect.Bottom()-1)
+		}
+	}
+}
+
+// resizeArrow is the glyph the handle under the pointer shows for the
+// direction it resizes.
+func resizeArrow(edges wm.Edges) string {
+	left := edges.Has(wm.EdgeLeft)
+	right := edges.Has(wm.EdgeRight)
+	top := edges.Has(wm.EdgeTop)
+	bottom := edges.Has(wm.EdgeBottom)
+
+	switch {
+	case (left || right) && (top || bottom):
+		switch {
+		case left && top:
+			return "↖"
+		case right && top:
+			return "↗"
+		case left && bottom:
+			return "↙"
+		default:
+			return "↘"
+		}
+	case left || right:
+		return "↔"
+	default:
+		return "↕"
+	}
+}
+
 // windowTitle is the name an app asked for, or empty when it has none.
 func windowTitle(w *wm.Window) string {
 	named, ok := w.App.(appsdk.Named)

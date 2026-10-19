@@ -65,6 +65,9 @@ type Model struct {
 
 	// drag is the mouse gesture in flight, if any.
 	drag dragState
+	// hover is the resize handle under the pointer while no gesture is
+	// running; the frame lights it up to advertise that it can be resized.
+	hover hoverState
 	// memo remembers the last mouse click, so the next one can be told apart
 	// as a double click.
 	memo lastClick
@@ -299,6 +302,11 @@ func (m *Model) View() tea.View {
 			continue
 		}
 		m.drawWindow(w, w == focused)
+		// The hover goes on right after its own window, so a window stacked
+		// higher still covers the part of the handle it overlaps.
+		if !m.drag.active() && m.hover.id == w.ID {
+			m.drawResizeHover(w)
+		}
 	}
 
 	if m.options.Taskbar {
@@ -320,7 +328,10 @@ func (m *Model) View() tea.View {
 
 	view := tea.NewView(m.screen.String())
 	if m.options.Mouse {
-		view.MouseMode = tea.MouseModeCellMotion
+		// All motion, not just motion while a button is held: hovering a frame
+		// has to reach the shell before the button goes down for the resize
+		// hint to mean anything.
+		view.MouseMode = tea.MouseModeAllMotion
 	} else {
 		view.MouseMode = tea.MouseModeNone
 	}
@@ -365,6 +376,9 @@ func (m *Model) resize(width, height int) tea.Cmd {
 }
 
 func (m *Model) onKeyPress(msg tea.KeyPressMsg) tea.Cmd {
+	// The pointer did not move, but the desktop under it may have: keys move,
+	// resize and close windows, so any hover from before is stale.
+	m.hover = hoverState{}
 	if m.launcher.open {
 		return m.launcherKey(msg)
 	}

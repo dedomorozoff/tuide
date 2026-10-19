@@ -34,6 +34,12 @@ type Styles struct {
 	Border      lipgloss.Style
 	BorderFocus lipgloss.Style
 
+	// HoverHandle marks the resize edge under the pointer and HoverHandleActive
+	// the exact cell it is on, so a frame reads as grabbable before the button
+	// goes down.
+	HoverHandle       lipgloss.Style
+	HoverHandleActive lipgloss.Style
+
 	Title       lipgloss.Style
 	TitleFocus  lipgloss.Style
 	TitleDim    lipgloss.Style
@@ -74,6 +80,9 @@ func NewStyles(t Theme) Styles {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(t.BorderFocused).
 			Background(t.Background),
+
+		HoverHandle:       lipgloss.NewStyle().Foreground(t.Accent).Bold(true),
+		HoverHandleActive: lipgloss.NewStyle().Foreground(t.Background).Background(t.Accent).Bold(true),
 
 		Title:       lipgloss.NewStyle().Foreground(t.Text).Background(t.TitleBar),
 		TitleFocus:  lipgloss.NewStyle().Foreground(t.TextStrong).Background(t.TitleBarFocus),
