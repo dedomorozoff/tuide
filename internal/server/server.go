@@ -16,6 +16,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 
 	"github.com/dedomorozoff/tuide/internal/shell"
 	"github.com/dedomorozoff/tuide/internal/wire"
@@ -111,6 +112,7 @@ func (s *Server) Run() error {
 	s.program = tea.NewProgram(s.model,
 		tea.WithInput(reader),
 		tea.WithOutput(s.mirror),
+		tea.WithColorProfile(colorProfile()),
 	)
 
 	go s.acceptLoop()
@@ -242,4 +244,13 @@ func (s *Server) goodbye() {
 func reject(conn net.Conn, reason string) {
 	_ = wire.Write(conn, wire.TypeError, []byte(reason))
 	conn.Close()
+}
+
+// colorProfile is the profile the desktop draws its frames in. The mirror is
+// not a terminal, so Bubble Tea would fall back to NoTTY on its own and strip
+// every color out of the stream; the decision comes from the environment the
+// session was started with instead, the way a client terminal looks to the
+// shell that launched it.
+func colorProfile() colorprofile.Profile {
+	return colorprofile.Env(os.Environ())
 }

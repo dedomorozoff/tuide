@@ -2,6 +2,7 @@ package server
 
 import (
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -199,4 +200,42 @@ func rawAttach(t *testing.T, addr, token string) net.Conn {
 		t.Fatalf("handshake reply = %q, want %q", kind, wire.TypeWelcome)
 	}
 	return conn
+}
+
+// TestServerKeepsTheClientColors checks the wire end to end: the mirror is
+// not a terminal, and a profile guessed from it strips every SGR out, so the
+// desktop pins the profile to the environment itself.
+func TestServerKeepsTheClientColors(t *testing.T) {
+	t.Setenv("TERM", "xterm-256color")
+	t.Setenv("TUIDE_CONFIG_DIR", t.TempDir())
+
+	srv := New(testDesktop(), nil)
+	done := make(chan error, 1)
+	go func() { done <- srv.Run() }()
+
+	defer func() {
+		client.Shutdown(waitAddr(t, srv), srv.Token())
+		<-done
+	}()
+	addr := waitAddr(t, srv)
+
+	conn := rawAttach(t, addr, srv.Token())
+	defer conn.Close()
+
+	// The first frame is the replay of a screen the desktop has not drawn
+	// on yet, so walk the updates until the first real frame shows up.
+	for i := 0; i < 25; i++ {
+		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		kind, payload, err := wire.Read(conn)
+		if err != nil {
+			t.Fatalf("read frame %d: %v", i, err)
+		}
+		if kind != wire.TypeOutput {
+			t.Fatalf("frame %d = %q, want %q", i, kind, wire.TypeOutput)
+		}
+		if strings.Contains(string(payload), "\x1b[38;") {
+			return
+		}
+	}
+	t.Error("no frame with a color after the attach")
 }
