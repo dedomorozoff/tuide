@@ -10,7 +10,7 @@ SRC := ./cmd/tuide
 EXE     := $(shell $(GO) env GOEXE)
 BINPATH := $(BIN)$(EXE)
 
-.PHONY: all build run vet test fmt fmt-fix check clean windows linux debug
+.PHONY: all build run ls kill vet test fmt fmt-fix check clean windows linux debug
 
 all: build
 
@@ -19,6 +19,12 @@ build:
 
 run:
 	$(GO) run $(SRC)
+
+ls:
+	$(GO) run $(SRC) ls
+
+kill:
+	$(GO) run $(SRC) kill-server
 
 vet:
 	$(GO) vet ./...
