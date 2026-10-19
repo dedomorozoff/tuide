@@ -22,7 +22,7 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 		Focused: "term-2",
 		Windows: []Window{
 			{ID: "notes", App: "notes", Rect: geom.Rect{X: 4, Y: 2, Width: 30, Height: 10}, Workspace: 2, State: 0},
-			{ID: "term-2", App: "term", Rect: geom.Rect{Width: 80, Height: 24}, Workspace: 2, State: 1},
+			{ID: "term-2", App: "term", Rect: geom.Rect{Width: 80, Height: 24}, Workspace: 2, State: 1, Content: []byte{1, 2, 3}},
 		},
 	}
 	if err := Save(want); err != nil {

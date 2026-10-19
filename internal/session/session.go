@@ -25,6 +25,10 @@ type Window struct {
 	Workspace int       `json:"workspace"`
 	// State is wm.State as a number: normal, maximized or minimized.
 	State int `json:"state"`
+	// Content is the app's own saved state, for apps that implement
+	// appsdk.Stateful. It is opaque here: the shell hands the same bytes back
+	// to a freshly launched app on restore.
+	Content []byte `json:"content,omitempty"`
 }
 
 // Snapshot is the whole desktop at one moment.

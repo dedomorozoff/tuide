@@ -13,6 +13,23 @@ import (
 	"github.com/dedomorozoff/tuide/internal/wm"
 )
 
+// statefulApp keeps a blob across a session save, the way the terminal keeps
+// its screen, so the shell's save and restore paths can be observed.
+type statefulApp struct {
+	content string
+}
+
+func (a *statefulApp) Init() tea.Cmd                        { return nil }
+func (a *statefulApp) Close() tea.Cmd                       { return nil }
+func (a *statefulApp) Update(tea.Msg) (appsdk.App, tea.Cmd) { return a, nil }
+func (a *statefulApp) View(appsdk.Context) tea.View         { return tea.NewView("") }
+
+func (a *statefulApp) SnapshotState() []byte { return []byte(a.content) }
+func (a *statefulApp) RestoreState(data []byte) error {
+	a.content = string(data)
+	return nil
+}
+
 func sessionDesktop(restore *session.Snapshot) *Model {
 	palette := theme.Get(theme.DefaultName)
 	return New(palette, []appsdk.Spec{
@@ -69,6 +86,42 @@ func TestSnapshotRestoreRoundTrip(t *testing.T) {
 	}
 	if focused := restored.windows.Focused(); focused == nil || focused.ID != "beta" {
 		t.Errorf("focused = %v, want beta", focused)
+	}
+}
+
+func TestSnapshotCarriesAppStateAndRestoreReplaysIt(t *testing.T) {
+	palette := theme.Get(theme.DefaultName)
+
+	desktop := New(palette, []appsdk.Spec{
+		specFor("alpha", func() appsdk.App { return &statefulApp{content: "live screen"} }),
+	}, Options{Width: 120, Height: 40, Taskbar: true})
+	_, _ = desktop.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	_ = desktop.launch("alpha")
+
+	snap := desktop.Snapshot()
+	if len(snap.Windows) != 1 {
+		t.Fatalf("snapshot holds %d windows, want 1", len(snap.Windows))
+	}
+	if got := string(snap.Windows[0].Content); got != "live screen" {
+		t.Fatalf("saved content = %q, want the app state", got)
+	}
+
+	restored := New(palette, []appsdk.Spec{
+		specFor("alpha", func() appsdk.App { return &statefulApp{} }),
+	}, Options{Width: 120, Height: 40, Taskbar: true, Restore: &snap})
+	_ = restored.Init()
+	_, _ = restored.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+	w := restored.windows.Find("alpha")
+	if w == nil {
+		t.Fatal("alpha was not restored")
+	}
+	app, ok := w.App.(*statefulApp)
+	if !ok {
+		t.Fatalf("restored app = %T, want *statefulApp", w.App)
+	}
+	if app.content != "live screen" {
+		t.Errorf("restored content = %q, want the saved blob", app.content)
 	}
 }
 

@@ -54,6 +54,20 @@ type Painter interface {
 	Paint(screen *compositor.Screen, rect geom.Rect)
 }
 
+// Stateful is implemented by apps whose contents are worth keeping across a
+// server restart. A session save asks for a blob and a restore hands it back to
+// a freshly launched app, which replays it before its program starts. The
+// terminal uses this: a window comes back showing the screen and scrollback it
+// had, even though the process behind it is a new one.
+type Stateful interface {
+	// SnapshotState returns the app state to persist, or nil when there is
+	// nothing to keep.
+	SnapshotState() []byte
+
+	// RestoreState replays a blob from SnapshotState. An empty blob is a no-op.
+	RestoreState([]byte) error
+}
+
 // MouseConsumer is implemented by apps that take pointer input inside their
 // own window. While one owns the pointer the shell forwards every press,
 // motion and release that lands in the window body and stops turning them
