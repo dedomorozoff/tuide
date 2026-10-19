@@ -35,6 +35,56 @@ func TestReplaySkipsTrailingBlanks(t *testing.T) {
 	}
 }
 
+func TestExpandNewlines(t *testing.T) {
+	if got := string(expandNewlines([]byte("one\ntwo\n"))); got != "one\r\ntwo\r\n" {
+		t.Errorf("bare newline came through raw: %q", got)
+	}
+	if got := string(expandNewlines([]byte("one\r\ntwo"))); got != "one\r\ntwo" {
+		t.Errorf("carriage before the newline was doubled: %q", got)
+	}
+	if got := string(expandNewlines([]byte("plain"))); got != "plain" {
+		t.Errorf("plain stream was rewritten: %q", got)
+	}
+}
+
+func TestMirrorReadsTheProgramNewlines(t *testing.T) {
+	m := newMirror()
+	m.Write([]byte("\x1b[2J\x1b[Hfirst\nsecond"))
+
+	if line := m.screen.Line(0); line != "first" {
+		t.Errorf("row 1 = %q, want first", line)
+	}
+	if line := m.screen.Line(1); line != "second" {
+		t.Errorf("row 2 = %q, want second at column 1", line)
+	}
+}
+
+func TestReplayClearsTheClientScreenFirst(t *testing.T) {
+	m := newMirror()
+	m.Write([]byte("\x1b[2J\x1b[Hhello frame"))
+
+	replay := string(m.replayLocked())
+	clearAt := strings.Index(replay, "\x1b[2J")
+	if clearAt == -1 {
+		t.Fatalf("replay does not clear the client screen: %q", replay)
+	}
+	if textAt := strings.Index(replay, "hello"); textAt < clearAt {
+		t.Errorf("the screen is cleared after the cells: %q", replay)
+	}
+}
+
+func TestReplayClearsTheAlternateScreen(t *testing.T) {
+	m := newMirror()
+	m.Write([]byte("\x1b[?1049h\x1b[Hhello frame"))
+
+	replay := string(m.replayLocked())
+	enter := strings.Index(replay, "\x1b[?1049h")
+	clear := strings.Index(replay, "\x1b[2J")
+	if enter == -1 || clear < enter {
+		t.Errorf("the clear lands outside the alternate screen: %q", replay)
+	}
+}
+
 func TestReplayTracksCursorVisibility(t *testing.T) {
 	m := newMirror()
 	m.Write([]byte("\x1b[?25h"))

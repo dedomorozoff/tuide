@@ -35,12 +35,13 @@ func newMirror() *mirror {
 // Write is the program's output. It never fails and never wedges on a client:
 // a stuck connection is dropped, not obeyed.
 func (m *mirror) Write(p []byte) (int, error) {
+	frames := expandNewlines(p)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.screen.Write(p)
+	m.screen.Write(frames)
 	dead := make([]*clientConn, 0, len(m.clients))
 	for _, c := range m.clients {
-		if c.send(wire.TypeOutput, p) != nil {
+		if c.send(wire.TypeOutput, frames) != nil {
 			c.conn.Close()
 			dead = append(dead, c)
 		}
@@ -49,6 +50,27 @@ func (m *mirror) Write(p []byte) (int, error) {
 		m.removeLocked(c)
 	}
 	return len(p), nil
+}
+
+// expandNewlines turns the program's bare newlines into carriage return and
+// line feed. The renderer talks by the rules of a terminal whose line
+// discipline maps a newline on its way out; no such driver sits between the
+// server and a client terminal, so the bytes must carry the carriage
+// themselves or every frame drawn with a newline lands at the wrong column.
+func expandNewlines(p []byte) []byte {
+	for i, b := range p {
+		if b == '\n' && (i == 0 || p[i-1] != '\r') {
+			out := make([]byte, 0, len(p)+len(p)/16+16)
+			for i, b := range p {
+				if b == '\n' && (i == 0 || p[i-1] != '\r') {
+					out = append(out, '\r')
+				}
+				out = append(out, b)
+			}
+			return out
+		}
+	}
+	return p
 }
 
 // attach adds a client and hands it the current screen.

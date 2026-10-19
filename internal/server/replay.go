@@ -15,7 +15,13 @@ func (m *mirror) replayLocked() []byte {
 
 	out = append(out, "\x1b[0m\x1b[?25l"...)
 	out = append(out, modeSequences(m.screen.Modes())...)
-	out = append(out, "\x1b[H"...)
+
+	// The client attaches to whatever its terminal already holds, and the
+	// replay only overdraws the cells the desktop uses. Clearing first keeps
+	// the shell output around the frame from bleeding through. The alternate
+	// screen is entered above, so this clears the buffer the desktop draws on
+	// and leaves the primary screen underneath it alone.
+	out = append(out, "\x1b[2J\x1b[H"...)
 
 	style := ""
 	for y := range height {
