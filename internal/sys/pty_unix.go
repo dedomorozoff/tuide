@@ -29,14 +29,37 @@ func startPTY(options PTYOptions) (PTY, error) {
 	cmd.Env = append(cmd.Env, "TERM=xterm-256color")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
 
+	master, slave, err := creack.Open()
+	if err != nil {
+		return nil, fmt.Errorf("sys: pty: open %s: %w", options.Command[0], err)
+	}
+
+	// The flow control keys belong to the desktop: ctrl+q ends the session,
+	// so a terminal window must not be able to freeze on ctrl+s with no way
+	// to thaw it again.
+	if err := disableFlowControl(slave); err != nil {
+		master.Close()
+		slave.Close()
+		return nil, err
+	}
+
 	size := &creack.Winsize{
 		Rows: uint16(options.Height),
 		Cols: uint16(options.Width),
 	}
-	master, err := creack.StartWithAttrs(cmd, size, cmd.SysProcAttr)
-	if err != nil {
+	if err := creack.Setsize(master, size); err != nil {
+		master.Close()
+		slave.Close()
+		return nil, fmt.Errorf("sys: pty: set size: %w", err)
+	}
+
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = slave, slave, slave
+	if err := cmd.Start(); err != nil {
+		master.Close()
+		slave.Close()
 		return nil, fmt.Errorf("sys: pty: start %s: %w", options.Command[0], err)
 	}
+	slave.Close()
 
 	return &unixPTY{master: master, cmd: cmd}, nil
 }

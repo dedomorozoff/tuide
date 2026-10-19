@@ -218,11 +218,16 @@ func TestControlChordsReachTheFocusedApp(t *testing.T) {
 
 	// Ctrl alone is almost never a desktop shortcut: the shell has to let
 	// these through so a terminal inside can receive ctrl+c and ctrl+w.
-	// ctrl+p is the one exception, bound to the launcher on purpose.
-	for _, code := range []rune{'c', 'w', 'q'} {
+	// ctrl+p is the one exception, bound to the launcher on purpose, and
+	// ctrl+q is the other, bound to the way out of the session.
+	for _, code := range []rune{'c', 'w'} {
 		if _, ok := m.keymap.Lookup(tea.KeyPressMsg(tea.Key{Code: code, Mod: tea.ModCtrl})); ok {
 			t.Errorf("ctrl+%c should not be a desktop shortcut", code)
 		}
+	}
+
+	if _, ok := m.keymap.Lookup(tea.KeyPressMsg(tea.Key{Code: 'q', Mod: tea.ModCtrl})); !ok {
+		t.Error("ctrl+q should end the session")
 	}
 }
 

@@ -68,6 +68,57 @@ func TestPTYEchoesWhatWasWritten(t *testing.T) {
 	}
 }
 
+// TestPTYDoesNotFreezeOnCtrlS keeps the flow control keys away from the
+// child. The desktop keeps ctrl+q for itself, and a terminal that could be
+// frozen with ctrl+s would have no way to thaw it again.
+func TestPTYDoesNotFreezeOnCtrlS(t *testing.T) {
+	requireLivePTY(t)
+	if runtime.GOOS == "windows" {
+		t.Skip("the windows pseudoconsole has no flow control to turn off")
+	}
+
+	terminal, err := sys.StartPTY(sys.PTYOptions{Width: 80, Height: 24})
+	if err != nil {
+		t.Skipf("no pseudo terminal available: %v", err)
+	}
+	defer func() { _ = terminal.Close() }()
+
+	if _, err := terminal.Write([]byte{0x13}); err != nil {
+		t.Fatalf("write ctrl+s: %v", err)
+	}
+	if _, err := terminal.Write([]byte("echo " + echoMarker + "\r\n")); err != nil {
+		t.Fatalf("write to pty: %v", err)
+	}
+
+	collected := make(chan []byte, 1)
+	go func() {
+		var all bytes.Buffer
+		buffer := make([]byte, 4096)
+		for {
+			n, err := terminal.Read(buffer)
+			if n > 0 {
+				all.Write(buffer[:n])
+				if bytes.Contains(all.Bytes(), []byte(echoMarker)) {
+					break
+				}
+			}
+			if err != nil {
+				break
+			}
+		}
+		collected <- all.Bytes()
+	}()
+
+	select {
+	case out := <-collected:
+		if !bytes.Contains(out, []byte(echoMarker)) {
+			t.Fatalf("child never echoed %q, got:\n%s", echoMarker, out)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("ctrl+s froze the terminal: no output within 5s")
+	}
+}
+
 func TestPTYReportsResize(t *testing.T) {
 	requireLivePTY(t)
 

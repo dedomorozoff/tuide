@@ -94,7 +94,7 @@ applies the change at once and writes the file back.
 | `Alt+Tab` / `Alt+Shift+Tab` | Cycle focus + window list |
 | `Alt+1..9` | Activate the N-th taskbar button; press again to minimize |
 | `Ctrl+Alt+W` | Close window |
-| `Ctrl+Alt+Q` | Quit |
+| `Ctrl+Q` / `Ctrl+Alt+Q` | Quit |
 
 ### Desktop
 
@@ -118,15 +118,17 @@ The month view also opens from the action palette ("Calendar").
 
 ### Terminal
 
-The desktop claims one bare `Ctrl` chord, `Ctrl+P`, so the launcher stays
-reachable on hosts that cannot report `Ctrl+Alt` at all — a Linux virtual
-console, a serial link, a minimal terminal. Everything else uses `Ctrl+Alt`,
-`Alt+Tab` or `Alt+1..9` and belongs to the program in the window: inside a
-terminal window that means `Ctrl+C` interrupts, `Ctrl+W` deletes a word and
-`Ctrl+Q` is XON, exactly as in any other terminal. The known prices are two:
-`Ctrl+P` takes one readline key — the previous history entry — and `Alt+1..9`
-takes tmux's own `Alt`+digit window keys, plus the tab keys of terminals like
-gnome-terminal.
+The desktop claims two bare `Ctrl` chords, `Ctrl+P` and `Ctrl+Q`: the
+launcher stays reachable on hosts that cannot report `Ctrl+Alt` at all — a
+Linux virtual console, a serial link, a minimal terminal — and the way out of
+the session stays one chord away. Everything else uses `Ctrl+Alt`, `Alt+Tab`
+or `Alt+1..9` and belongs to the program in the window: inside a terminal
+window that means `Ctrl+C` interrupts and `Ctrl+W` deletes a word. Terminal
+windows have no flow control of their own, so `Ctrl+S` does not freeze the
+output — a session that could be frozen with no way to thaw it would be
+worse than one without it. The known prices are two: `Ctrl+P` takes one
+readline key — the previous history entry — and `Alt+1..9` takes tmux's own
+`Alt`+digit window keys, plus the tab keys of terminals like gnome-terminal.
 
 | Keys | Action |
 | --- | --- |

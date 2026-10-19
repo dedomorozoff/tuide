@@ -8,9 +8,10 @@ import (
 // conservative: the focused app gets every key that is not claimed here.
 //
 // The desktop modifier is Ctrl+Alt. Bare Ctrl chords belong to the program
-// inside the window: ctrl+c interrupts, ctrl+w deletes a word and ctrl+q is
-// XON. Three bindings break that rule on purpose, and each one buys something
-// the desktop cannot get otherwise:
+// inside the window: ctrl+c interrupts and ctrl+w deletes a word. Ctrl+q is
+// the exception: it ends the session, the way ctrl+alt+q always did, so the
+// way out is one chord away. Three bindings break that rule on purpose, and
+// each one buys something the desktop cannot get otherwise:
 //
 //   - alt+tab cycles the focus, and no terminal program binds it;
 //   - ctrl+p opens the launcher, which is the way in on hosts that cannot
@@ -22,6 +23,7 @@ import (
 func Defaults() []Mapping {
 	mappings := []Mapping{
 		{Action: ActionQuit, Mods: tea.ModCtrl | tea.ModAlt, Key: 'q'},
+		{Action: ActionQuit, Mods: tea.ModCtrl, Key: 'q'},
 
 		{Action: ActionFocusNext, Mods: tea.ModAlt, Key: tea.KeyTab},
 		{Action: ActionFocusPrev, Mods: tea.ModAlt | tea.ModShift, Key: tea.KeyTab},
