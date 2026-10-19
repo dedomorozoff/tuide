@@ -53,17 +53,17 @@ func encodeKey(key tea.Key, modes vt.Modes) []byte {
 		}
 		return append(prefix, ' ')
 	case tea.KeyUp:
-		return cursorKey('A', param, modes.AppCursor)
+		return cursorKey('A', param, modes.AppCursor || modes.AppKeypad)
 	case tea.KeyDown:
-		return cursorKey('B', param, modes.AppCursor)
+		return cursorKey('B', param, modes.AppCursor || modes.AppKeypad)
 	case tea.KeyRight:
-		return cursorKey('C', param, modes.AppCursor)
+		return cursorKey('C', param, modes.AppCursor || modes.AppKeypad)
 	case tea.KeyLeft:
-		return cursorKey('D', param, modes.AppCursor)
+		return cursorKey('D', param, modes.AppCursor || modes.AppKeypad)
 	case tea.KeyHome:
-		return cursorKey('H', param, modes.AppCursor)
+		return cursorKey('H', param, modes.AppCursor || modes.AppKeypad)
 	case tea.KeyEnd:
-		return cursorKey('F', param, modes.AppCursor)
+		return cursorKey('F', param, modes.AppCursor || modes.AppKeypad)
 	case tea.KeyInsert:
 		return tildeKey(2, param)
 	case tea.KeyDelete:
